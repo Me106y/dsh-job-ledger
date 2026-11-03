@@ -27,13 +27,15 @@
 dsh plugin --profile web add dsh-job-ledger
 ```
 
-插件拉起一个专用 Chrome profile，首次由你扫码登录；之后复用登录态。所有数据留在本机。
+插件拉起一个专用 Chrome profile，首次由你扫码登录；**登录态保存在 `dataDir/chrome-profile`**，之后不用再扫。
+第一次跑时如果没登录，调用 `job_ledger_login`：它把登录页放到前台并等你扫描（默认 3 分钟），成功后自动继续；
+cookie 过期就再扫一次。所有数据留在本机。
 
 ## 你能拿到什么
 
-**九个工具**（模型侧）：`job_ledger_profile` · `job_ledger_resume` · `job_ledger_discover` ·
-`job_ledger_queue` · `job_ledger_apply` · `job_ledger_record` · `job_ledger_reconcile` ·
-`job_ledger_backfill` · `job_ledger_report`。
+**十个工具**（模型侧）：`job_ledger_profile` · `job_ledger_login` · `job_ledger_resume` ·
+`job_ledger_discover` · `job_ledger_queue` · `job_ledger_apply` · `job_ledger_record` ·
+`job_ledger_reconcile` · `job_ledger_backfill` · `job_ledger_report`。
 `apply` 是唯一的投递入口，面板和工具都走它。
 
 **一个面板**（三屏）：待投（勾选 + 进度）· 概览（今日已投 / 剩余额度 / 不确定 / 差异 / 昨日回复）·

@@ -33,6 +33,7 @@ import {
   registerApplyTool,
   registerBackfillTool,
   registerDiscoverTool,
+  registerLoginTool,
   registerRecordTool,
   registerProfileTool,
   registerReportTool,
@@ -260,6 +261,7 @@ export function apply(ctx: Context, config: ConfigInput = {}): void {
   registerReconcileTool(ctx, ledger, runtime)
   registerReportTool(ctx, ledger, resolved.dataDir)
   registerProfileTool(ctx, resolved)
+  registerLoginTool(ctx, runtime)
   registerBackfillTool(ctx, ledger, runtime)
   registerRecordTool(ctx, ledger)
 

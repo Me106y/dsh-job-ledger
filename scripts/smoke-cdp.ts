@@ -14,6 +14,9 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import { createServer } from 'node:http'
+import type { AddressInfo } from 'node:net'
+
 import { CdpReader } from '../src/cdp/browser.ts'
 import { BOSS_URLS, isLoginUrl } from '../src/cdp/boss.ts'
 import { ensureChrome, findPageTarget } from '../src/cdp/chrome.ts'
@@ -105,6 +108,54 @@ async function main(): Promise<void> {
           ? `redirected to ${finalUrl}`
           : `stayed at ${finalUrl} (an overlay would not be detected)`,
       )
+
+      console.log('8. a page that reports what happened to it')
+      const page = createServer((request, response) => {
+        if (request.url === '/api/ping') {
+          response.writeHead(200, { 'content-type': 'application/json' })
+          response.end(JSON.stringify({ ok: true, trusted: true }))
+          return
+        }
+        response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+        response.end(`<!doctype html><html><body>
+          <button id="go">go</button>
+          <input id="name" />
+          <p id="result">idle</p>
+          <p id="echo"></p>
+          <script>
+            document.getElementById('go').addEventListener('click', (event) => {
+              document.getElementById('result').textContent = event.isTrusted ? 'trusted' : 'synthetic'
+            })
+            document.getElementById('name').addEventListener('input', (event) => {
+              document.getElementById('echo').textContent = event.target.value
+            })
+            fetch('/api/ping')
+          </script>
+        </body></html>`)
+      })
+      await new Promise<void>((resolve) => page.listen(0, '127.0.0.1', resolve))
+      const origin = `http://127.0.0.1:${String((page.address() as AddressInfo).port)}`
+
+      console.log('9. capture a response the page requested itself')
+      const pending = reader.capture(/\/api\/ping/)
+      await reader.navigate(`${origin}/`)
+      const payload = (await pending) as { ok?: boolean }
+      if (payload.ok !== true) fail('capture', `unexpected payload ${JSON.stringify(payload)}`)
+      ok('capture', JSON.stringify(payload))
+
+      console.log('10. a click is a trusted event (no synthetic .click())')
+      await reader.click('#go', 3_000)
+      const result = await reader.text('#result')
+      if (result !== 'trusted') fail('click', `page saw "${result}"`)
+      ok('click', 'page reports event.isTrusted === true')
+
+      console.log('11. typing reaches the element')
+      await reader.typeText('#name', 'hello', 3_000)
+      const echoed = await reader.text('#echo')
+      if (echoed !== 'hello') fail('type', `page echoes "${echoed}"`)
+      ok('type', 'input event carries the inserted text')
+
+      await new Promise<void>((resolve) => page.close(() => resolve()))
     } finally {
       reader.close()
     }
@@ -117,8 +168,15 @@ async function main(): Promise<void> {
       } catch {
         // Already gone.
       }
+      await new Promise<void>((resolve) => setTimeout(resolve, 500))
     }
-    rmSync(profileDir, { recursive: true, force: true })
+    // Best effort: Chrome may still be flushing its profile when the process is asked to leave, and
+    // a leftover temp directory is not a failed smoke test.
+    try {
+      rmSync(profileDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
+    } catch {
+      console.log(`  note temp profile left behind: ${profileDir}`)
+    }
   }
 }
 

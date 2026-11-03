@@ -60,3 +60,45 @@ export async function assertLoggedIn(
     if (attempt < attempts - 1) await sleep(intervalMs)
   }
 }
+
+/** How long the plugin waits for a person to finish scanning, by default. */
+export const LOGIN_WAIT_MS = 180_000
+
+/** How often the URL is checked while waiting. */
+export const LOGIN_WAIT_POLL_MS = 1_000
+
+/** Knobs for {@link waitForLogin}; tests shrink them. */
+export interface LoginWaitOptions {
+  readonly timeoutMs?: number | undefined
+  readonly pollMs?: number | undefined
+  readonly sleep?: ((ms: number) => Promise<void>) | undefined
+}
+
+/**
+ * Wait for the person to finish logging in.
+ *
+ * The dedicated Chrome profile keeps cookies between runs, so this is needed only on first use or
+ * after the platform expires the session. Success is "the URL left the login page", which is the
+ * signal observed on a real session: a logged-out visit redirects to `/web/user/`, and a completed
+ * login navigates away from it.
+ *
+ * @param browser reader positioned on the login page
+ * @param options polling knobs
+ * @returns true when the login page was left before the deadline
+ */
+export async function waitForLogin(
+  browser: BrowserReader,
+  options: LoginWaitOptions = {},
+): Promise<boolean> {
+  const timeoutMs = options.timeoutMs ?? LOGIN_WAIT_MS
+  const pollMs = options.pollMs ?? LOGIN_WAIT_POLL_MS
+  const sleep =
+    options.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)))
+
+  const deadline = Date.now() + timeoutMs
+  for (;;) {
+    if (!isLoginUrl(await browser.currentUrl())) return true
+    if (Date.now() >= deadline) return false
+    await sleep(pollMs)
+  }
+}
