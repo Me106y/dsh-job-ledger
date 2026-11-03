@@ -70,8 +70,8 @@ export interface RunnerContext {
   readonly ledger: Ledger
   readonly applier: JobApplier
   readonly dataDir: string
-  /** The greeting for one job. Slot filling lands later; the runner only needs the string. */
-  readonly greeting: (job: Job) => string
+  /** The greeting for one job. May read the resume, so it is allowed to be async. */
+  readonly greeting: (job: Job) => string | Promise<string>
   readonly clock?: (() => number) | undefined
   readonly newAppId?: (() => string) | undefined
   readonly newRunId?: (() => string) | undefined
@@ -117,7 +117,7 @@ export class JobRunner {
   readonly #ledger: Ledger
   readonly #applier: JobApplier
   readonly #dataDir: string
-  readonly #greeting: (job: Job) => string
+  readonly #greeting: (job: Job) => string | Promise<string>
   readonly #clock: () => number
   readonly #newAppId: () => string
   readonly #newRunId: () => string
@@ -273,7 +273,7 @@ export class JobRunner {
   async #attempt(job: Job, appId: string): Promise<AttemptOutcome> {
     try {
       await this.#applier.prepare(job)
-      const sent = await this.#applier.send(job, this.#greeting(job))
+      const sent = await this.#applier.send(job, await this.#greeting(job))
       const verdict = judgeAttempt({
         clicked: sent.clicked,
         network: sent.network,
