@@ -33,6 +33,7 @@ import {
   registerApplyTool,
   registerBackfillTool,
   registerDiscoverTool,
+  registerRecordTool,
   registerProfileTool,
   registerReportTool,
   registerQueueTool,
@@ -260,6 +261,7 @@ export function apply(ctx: Context, config: ConfigInput = {}): void {
   registerReportTool(ctx, ledger, resolved.dataDir)
   registerProfileTool(ctx, resolved)
   registerBackfillTool(ctx, ledger, runtime)
+  registerRecordTool(ctx, ledger)
 
   const skill = loadSkillBody()
   if (skill !== undefined) registerSkill(ctx, skill)

@@ -34,6 +34,8 @@ import type { ApplyToolResult, RunStarter } from './apply.ts'
 import { REPORT_TOOL_DESCRIPTION, REPORT_TOOL_NAME, renderReportResult, reportForModel } from './report.ts'
 import type { ReportToolResult } from './report.ts'
 import { PROFILE_TOOL_DESCRIPTION, PROFILE_TOOL_NAME, profileView } from './profile.ts'
+import { RECORD_TOOL_DESCRIPTION, RECORD_TOOL_NAME, recordForModel, renderRecordResult } from './record.ts'
+import type { RecordToolResult } from './record.ts'
 import { BACKFILL_TOOL_DESCRIPTION, BACKFILL_TOOL_NAME, backfillForModel, renderBackfillResult } from './backfill.ts'
 import type { BackfillToolResult } from './backfill.ts'
 import {
@@ -628,4 +630,74 @@ export function registerBackfillTool(
   runtime: ReaderProvider,
 ): () => void {
   return ctx.tools.register(backfillTool(ledger, runtime))
+}
+
+/**
+ * Build the record tool definition.
+ *
+ * @param ledger the single writer
+ * @returns the definition to register
+ */
+export function recordTool(ledger: Ledger) {
+  return defineTool({
+    name: RECORD_TOOL_NAME,
+    description: RECORD_TOOL_DESCRIPTION,
+    parameters: {
+      appId: { type: 'string', description: '申请 id（与 jobId 二选一）' },
+      jobId: { type: 'string', description: '岗位 id：取该岗位最近一次申请（与 appId 二选一）' },
+      state: {
+        type: 'string',
+        enum: ['replied', 'interview', 'offer', 'rejected', 'withdrawn', 'failed', 'submitted'],
+        required: true,
+        description: '目标状态；非法转移会被拒绝并返回允许列表',
+      },
+      note: { type: 'string', description: '一句话备注，例如「HR 回复约面」' },
+    },
+    output: {
+      schema: {
+        oneOf: [
+          {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              ok: { type: 'boolean', const: true, required: true },
+              appId: { type: 'string', required: true },
+              state: { type: 'string', required: true },
+            },
+          },
+          {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              ok: { type: 'boolean', const: false, required: true },
+              code: { type: 'string', required: true },
+              message: { type: 'string', required: true },
+              allowed: { type: 'string' },
+            },
+          },
+        ],
+      },
+      render(_args, value) {
+        return [{ type: 'text', text: renderRecordResult(value as RecordToolResult) }]
+      },
+    },
+    async execute(args) {
+      return recordForModel(ledger, {
+        ...(args.appId === undefined ? {} : { appId: args.appId }),
+        ...(args.jobId === undefined ? {} : { jobId: args.jobId }),
+        state: args.state,
+        ...(args.note === undefined ? {} : { note: args.note }),
+      })
+    },
+  })
+}
+
+/**
+ * Register the record tool.
+ *
+ * @param ctx host context @param ledger the single writer
+ * @returns the disposer
+ */
+export function registerRecordTool(ctx: Context, ledger: Ledger): () => void {
+  return ctx.tools.register(recordTool(ledger))
 }
