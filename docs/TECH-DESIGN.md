@@ -95,7 +95,7 @@
         "@deepseek-ai/dsh-client-ui-sidebar"
       ],
       "external": [
-        "react", "react-dom",
+        "react", "react-dom", "react/jsx-runtime",
         "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-client-ui-renderer",
         "@deepseek-ai/dsh-client-ui-layout",
@@ -169,7 +169,14 @@ test/
 ### 3.3 构建
 
 - 两个入口：`src/index.ts` → `lib/index.js`；`src/client/index.tsx` → `lib/client.js`。
-- tsdown 配置两份，client 那份 `external: [/^react/, /^@deepseek-ai\//]`。
+- tsdown 配置两份。client 那份用 `deps.neverBundle` 按**名字**外置 `react`、`react-dom`、`react/jsx-runtime` 与用到的 DSH 客户端包（`deps.neverBundle` 与 `external` 互斥，tsdown 0.22 起写前者）。
+- **client 产物必须是 classic script，不能是 ESM**：DSH 用一个 classic `<script>` 挂载 client bundle（`dsh-client-modules` 的 `defaultLoadBundle`），文件里出现顶层 `import`/`export` 就会被浏览器判为 `SyntaxError: Cannot use import statement outside a module`——该条目不激活，Web 启动提示 `<包名>: import failed`，其余插件照常。正确形态是 CJS 包在模块加载器的工厂闭包里：
+
+  ```js
+  window.__ModuleLoader__.load({ id: "dsh-job-ledger", factory: (require) => { /* … */ return module.exports } })
+  ```
+
+  由 `tsdown.config.ts` 的 `banner` / `intro` / `footer` 生成；`id` 必须等于包名（启动图按这个名字归档）。页面里没有 import map，裸模块说明符只由工厂收到的 `require` 解析。`pnpm build` 末尾跑 `scripts/check-client-bundle.ts`，用 vm 按 classic script 真跑一遍产物，形态错了直接构建失败。
 - CSS：`import './client.css'` 由 tsdown 注入，DSH 用设计 token（`--dsh-*`），不自造色板。
 - 开发循环：改 host 代码 → 重启 plugin（HMR 或 `ctx.fiber.restart()`）；改 client → 需要 `pnpm run dev:web` 才能免刷新，否则重建 + 刷新页面。**这个约束要写进 README**，否则每次改 UI 都会以为坏了。
 
@@ -999,7 +1006,8 @@ interface BrowserPort {
 **不需要账号的那一半已经自动化**：`pnpm smoke:cdp` 启动真实 Chrome、连 CDP、打开 BOSS、读 DOM、截图、
 验证缺失选择器的错误码，检查登录墙，并在一个本地测试页上验证两件事：**点击是可信事件**
 （`event.isTrusted === true`，即没有用合成 `.click()`）与**数据来自页面自己发出的请求**（arm 后导航，
-捕获到页面自身 `fetch` 的响应）。2026-11-03 在本机（Chrome 156）跑通，同时暴露并修掉了四个真 bug：
+捕获到页面自身 `fetch` 的响应）。它还用一个本地页面验证登录等待的两条路径：URL 离开登录页 → 成功；
+一直不离开 → 返回 false（而不是假装登录成功）。2026-11-03 在本机（Chrome 156）跑通，同时暴露并修掉了四个真 bug：
 
 1. 连的是 **browser 级** WebSocket，`Page.enable` 在那一层不存在——必须连 page target；
 2. `currentUrl` 用 `Runtime.evaluate` 取，BOSS 的页面会卡住渲染线程（15s 无响应）——改走

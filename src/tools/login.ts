@@ -10,7 +10,7 @@
  */
 
 import { BOSS_SELECTORS, BOSS_URLS, isLoginUrl } from '../cdp/boss.ts'
-import { waitForLogin } from '../cdp/login.ts'
+import { waitForLogin, waitForLoginPage } from '../cdp/login.ts'
 import type { ReaderProvider } from '../runtime/browser.ts'
 import { PluginError, userMessage } from '../shared/errors.ts'
 
@@ -68,7 +68,24 @@ export async function loginForModel(
       // Best effort by design.
     }
 
+    // Absorb the moment where the browser still reports the previous page.
+    const arrived = await waitForLoginPage(reader, {
+      ...(options.pollMs === undefined ? {} : { pollMs: options.pollMs }),
+      ...(options.sleep === undefined ? {} : { sleep: options.sleep }),
+    })
+
+    if (!arrived) {
+      // The page can leave the login URL before the first look (a fast scan). Confirm on a protected
+      // page rather than trusting one stale reading.
+      await reader.navigate(BOSS_URLS.resume)
+      const after = await reader.currentUrl()
+      if (!isLoginUrl(after)) {
+        return { ok: true, alreadyLoggedIn: false, url: after }
+      }
+    }
+
     const loggedIn = await waitForLogin(reader, {
+      assumeLoginSeen: true,
       ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
       ...(options.pollMs === undefined ? {} : { pollMs: options.pollMs }),
       ...(options.sleep === undefined ? {} : { sleep: options.sleep }),
