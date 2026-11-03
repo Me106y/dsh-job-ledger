@@ -31,6 +31,9 @@ import { QUEUE_TOOL_DESCRIPTION, QUEUE_TOOL_NAME, queueForModel, renderQueueResu
 import type { QueueToolResult } from './queue.ts'
 import { APPLY_TOOL_DESCRIPTION, APPLY_TOOL_NAME, applyForModel, renderApplyResult } from './apply.ts'
 import type { ApplyToolResult, RunStarter } from './apply.ts'
+import { REPORT_TOOL_DESCRIPTION, REPORT_TOOL_NAME, renderReportResult, reportForModel } from './report.ts'
+import type { ReportToolResult } from './report.ts'
+import { PROFILE_TOOL_DESCRIPTION, PROFILE_TOOL_NAME, profileView } from './profile.ts'
 import {
   RECONCILE_TOOL_DESCRIPTION,
   RECONCILE_TOOL_NAME,
@@ -461,4 +464,105 @@ export function registerReconcileTool(
   runtime: ReaderProvider,
 ): () => void {
   return ctx.tools.register(reconcileTool(ledger, runtime))
+}
+
+/**
+ * Build the report tool definition.
+ *
+ * @param ledger the open ledger
+ * @param dataDir where a snapshot may be saved
+ * @returns the definition to register
+ */
+export function reportTool(ledger: Ledger, dataDir: string) {
+  return defineTool({
+    name: REPORT_TOOL_NAME,
+    description: REPORT_TOOL_DESCRIPTION,
+    parameters: {
+      save: {
+        type: 'boolean',
+        description: '同时把 Markdown 写到数据目录的 snapshot.md',
+      },
+    },
+    output: {
+      schema: {
+        oneOf: [
+          {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              ok: { type: 'boolean', const: true, required: true },
+              markdown: { type: 'string', required: true },
+              savedTo: { type: 'string' },
+            },
+          },
+          {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              ok: { type: 'boolean', const: false, required: true },
+              code: { type: 'string', required: true },
+              message: { type: 'string', required: true },
+            },
+          },
+        ],
+      },
+      render(_args, value) {
+        return [{ type: 'text', text: renderReportResult(value as ReportToolResult) }]
+      },
+    },
+    async execute(args) {
+      return reportForModel(ledger, { save: args.save === true, dataDir })
+    },
+  })
+}
+
+/**
+ * Register the report tool.
+ *
+ * @param ctx host context @param ledger open ledger @param dataDir data directory
+ * @returns the disposer
+ */
+export function registerReportTool(ctx: Context, ledger: Ledger, dataDir: string): () => void {
+  return ctx.tools.register(reportTool(ledger, dataDir))
+}
+
+/**
+ * Build the profile tool definition. Read-only; no configuration is written.
+ *
+ * @param config resolved configuration
+ * @returns the definition to register
+ */
+export function profileTool(config: LedgerConfig) {
+  return defineTool({
+    name: PROFILE_TOOL_NAME,
+    description: PROFILE_TOOL_DESCRIPTION,
+    parameters: {},
+    output: {
+      schema: { type: 'json' },
+      render(_args, value) {
+        const view = value as unknown as ReturnType<typeof profileView>
+        const roles = view.target.roles.length === 0 ? '取自简历' : view.target.roles.join('、')
+        return [
+          {
+            type: 'text',
+            text: `目标：${roles} · 城市 ${view.target.cities.join('、') || '不限'} · 薪资 ≥ ${String(view.target.salaryMin)} · 单轮 ${String(view.limits.runSize)} / 每日 ${String(view.limits.daily)}`,
+          },
+        ]
+      },
+    },
+    async execute() {
+      // Round-trip so the value is lossless JSON, which is what the `json` output node enforces.
+      return JSON.parse(JSON.stringify(profileView(config))) as never
+    },
+  })
+}
+
+/**
+ * Register the profile tool.
+ *
+ * @param ctx host context @param config resolved configuration
+ * @returns the disposer
+ */
+export function registerProfileTool(ctx: Context, config: LedgerConfig): () => void {
+  return ctx.tools.register(profileTool(config))
 }

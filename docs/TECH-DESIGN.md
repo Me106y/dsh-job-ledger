@@ -858,6 +858,9 @@ Skill 不是文档，是**约束**。每条约束都要有对应的工具侧校�
 
 ---
 
+**实现**：`assets/job-ledger/SKILL.md` 存正文（改规则就是改 Markdown），`src/skill.ts` 读取并注册；
+宿主没有 `skills` 服务时跳过——缺 skill 是降级体验，不是坏账本。
+
 ## 14. 配置
 
 ```yaml
