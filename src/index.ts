@@ -18,6 +18,9 @@ import { createApplier } from './cdp/applier.ts'
 import type { BrowserPort } from './cdp/browser.ts'
 import type { Job } from './ledger/events.ts'
 import { JobRunner } from './run/executor.ts'
+import { fillGreeting } from './resume/greeting.ts'
+import { readResume } from './resume/read.ts'
+import type { Resume } from './resume/parse.ts'
 import { BrowserRuntime } from './runtime/browser.ts'
 import { Ledger } from './ledger/store.ts'
 import { registerApplyTool, registerDiscoverTool, registerQueueTool, registerResumeTool } from './tools/register.ts'
@@ -178,16 +181,25 @@ export {
 export type { DiscoverOptions, DiscoverToolResult, DiscoveredJob } from './tools/discover.ts'
 
 /**
- * Greeting used until slot filling lands (PRD §5.5).
+ * Build the greeting for one job (PRD §5.5).
  *
- * ⚠️ Placeholder: the design requires BOSS's preset template plus slots whose values are quoted
- * from the resume or the JD. This sentence fills nothing, so it is safe but not yet the product.
+ * The resume is read once per session and cached: it changes rarely, and reading it for every job
+ * would turn a run into a series of page loads. If it cannot be read, the greeting falls back to
+ * the bare preset rather than inventing anything.
  *
- * @param job job being applied to
- * @returns the message to type
+ * @param runtime browser access
+ * @returns a function from job to greeting text
  */
-function defaultGreeting(job: Job): string {
-  return `你好，我对「${job.title}」这个岗位很感兴趣，方便聊聊吗？`
+function createGreeting(runtime: BrowserRuntime): (job: Job) => Promise<string> {
+  let resume: Promise<Resume> | undefined
+  return async (job: Job): Promise<string> => {
+    try {
+      resume ??= runtime.reader().then((reader) => readResume(reader))
+      return fillGreeting({ job, resume: await resume }).text
+    } catch {
+      return fillGreeting({ job }).text
+    }
+  }
 }
 
 /**
@@ -214,13 +226,15 @@ export function apply(ctx: Context, config: ConfigInput = {}): void {
   const ledger = Ledger.open(join(resolved.dataDir, 'events.jsonl'))
   const runtime = new BrowserRuntime(resolved)
 
+  const greeting = createGreeting(runtime)
+
   const runner = new JobRunner({
     ledger,
     // CdpReader implements BrowserPort; the runtime's type is the narrower reader because tests
     // substitute a reader-only double.
     applier: createApplier(async () => (await runtime.reader()) as BrowserPort),
     dataDir: resolved.dataDir,
-    greeting: defaultGreeting,
+    greeting,
   })
 
   registerResumeTool(ctx, runtime, resolved)
