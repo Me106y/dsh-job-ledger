@@ -91,6 +91,35 @@ export type { ClaimInput, ClaimVerdict } from './run/lease.ts'
 export { buildReport, reportMarkdown } from './report/build.ts'
 export type { Funnel, Report, SourceRow, WeekRow } from './report/build.ts'
 
+export { defaultDataDir, dshHome, expandHome, resolveConfig } from './config.ts'
+export type { ConfigInput, LedgerConfig } from './config.ts'
+
+export { BOSS_API, BOSS_BUSINESS_CODES, BOSS_URLS, BOSS_VERSION, bossErrorCode } from './cdp/boss.ts'
+export { CdpReader, NAVIGATE_TIMEOUT_MS } from './cdp/browser.ts'
+export type { BrowserReader } from './cdp/browser.ts'
+export {
+  DEFAULT_DEBUG_PORT,
+  chromeCandidates,
+  ensureChrome,
+  launchArgs,
+  probeDebugPort,
+} from './cdp/chrome.ts'
+export type { ChromeDeps, ChromeHandle, ChromeOptions, DebugTarget } from './cdp/chrome.ts'
+export { CAPTURE_TIMEOUT_MS, captureResponse, parseJsonBody } from './cdp/network.ts'
+export { CDP_CALL_TIMEOUT_MS, CdpError, CdpSession } from './cdp/session.ts'
+export type { CdpErrorKind, CdpEvent, CdpTransport } from './cdp/session.ts'
+export { CONNECT_TIMEOUT_MS, webSocketTransport } from './cdp/transport.ts'
+
+export { parseResume, summarizeResume } from './resume/parse.ts'
+export type {
+  Resume,
+  ResumeContact,
+  ResumeExperience,
+  ResumePayloads,
+} from './resume/parse.ts'
+export { assertBossSuccess, readResume } from './resume/read.ts'
+export { redactResume } from './resume/redact.ts'
+
 /** Cordis plugin name. */
 export const name = 'job-ledger'
 
