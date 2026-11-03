@@ -22,6 +22,8 @@ test('the real click mechanism is not flagged', () => {
     fired('src/cdp/apply.ts', "await session.call('Input.dispatchMouseEvent', { type: 'mousePressed' })"),
     [],
   )
+  // Our own port API takes a selector and dispatches real input events behind it.
+  assert.deepEqual(fired('src/cdp/applier.ts', "await this.#port.click(BOSS_SELECTORS.contactButton)"), [])
 })
 
 test('a request we issue to the platform is caught', () => {
