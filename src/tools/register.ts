@@ -34,6 +34,8 @@ import type { ApplyToolResult, RunStarter } from './apply.ts'
 import { REPORT_TOOL_DESCRIPTION, REPORT_TOOL_NAME, renderReportResult, reportForModel } from './report.ts'
 import type { ReportToolResult } from './report.ts'
 import { PROFILE_TOOL_DESCRIPTION, PROFILE_TOOL_NAME, profileView } from './profile.ts'
+import { BACKFILL_TOOL_DESCRIPTION, BACKFILL_TOOL_NAME, backfillForModel, renderBackfillResult } from './backfill.ts'
+import type { BackfillToolResult } from './backfill.ts'
 import {
   RECONCILE_TOOL_DESCRIPTION,
   RECONCILE_TOOL_NAME,
@@ -565,4 +567,65 @@ export function profileTool(config: LedgerConfig) {
  */
 export function registerProfileTool(ctx: Context, config: LedgerConfig): () => void {
   return ctx.tools.register(profileTool(config))
+}
+
+/**
+ * Build the backfill tool definition.
+ *
+ * @param ledger the single writer
+ * @param runtime reader provider
+ * @returns the definition to register
+ */
+export function backfillTool(ledger: Ledger, runtime: ReaderProvider) {
+  return defineTool({
+    name: BACKFILL_TOOL_NAME,
+    description: BACKFILL_TOOL_DESCRIPTION,
+    parameters: {},
+    output: {
+      schema: {
+        oneOf: [
+          {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              ok: { type: 'boolean', const: true, required: true },
+              matched: { type: 'number', required: true },
+              backfilled: { type: 'number', required: true },
+              partial: { type: 'boolean', required: true },
+            },
+          },
+          {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              ok: { type: 'boolean', const: false, required: true },
+              code: { type: 'string', required: true },
+              message: { type: 'string', required: true },
+            },
+          },
+        ],
+      },
+      render(_args, value) {
+        return [{ type: 'text', text: renderBackfillResult(value as BackfillToolResult) }]
+      },
+    },
+    timeoutMs: 60_000,
+    async execute() {
+      return backfillForModel(runtime, ledger)
+    },
+  })
+}
+
+/**
+ * Register the backfill tool.
+ *
+ * @param ctx host context @param ledger the single writer @param runtime reader provider
+ * @returns the disposer
+ */
+export function registerBackfillTool(
+  ctx: Context,
+  ledger: Ledger,
+  runtime: ReaderProvider,
+): () => void {
+  return ctx.tools.register(backfillTool(ledger, runtime))
 }

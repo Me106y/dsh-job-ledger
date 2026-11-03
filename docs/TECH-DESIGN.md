@@ -440,6 +440,9 @@ v0.1 **不做压缩**。理由：单用户一年最多几万条事件，JSONL �
 
 只做一件：每周导出 `snapshot.md`（报表）到工作区，作为人肉备份。
 
+**实现**：`src/report/snapshot.ts` 的 `weeklySnapshot()` 用 ISO 周标记（`snapshot-week`）保证一周只写一次；
+插件挂载时执行，写失败只吞掉异常不影响启动——报表是便利，账本才是产品。
+
 **报表口径**（与 PRD §5.8 一致，P0 已实现）：
 
 - 「投递」只计已确认进入 `submitted` 及之后阶段的申请；`applying` / `failed` / `uncertain`
@@ -693,6 +696,9 @@ if (ledgerSaysRejected && platformHas) /* 不动 */
 - `source: 'reconcile-backfill'`，`resumeId: 'unknown'`；
 - 只进判重索引，不进报表（`report()` 过滤 `source !== 'reconcile-backfill'`）；
 - 不写 `evidence`（没有截图，也不该伪造）。
+
+**实现**：`job_ledger_backfill` 工具复用同一条读取路径（同样**只读第一页**），`source: reconcile-backfill`。
+重复执行按 `platform:externalId` 幂等；输出会明说"只导入了平台最近一页"。
 
 **差异列表不落库**：锁定的 schema 只有 `reconcile/summary`（计数），所以"账本有、平台无"的行由
 `reconcile()` **返回**给调用方（工具/面板）显示，不新增事件类型。重启后列表清空，重新对账即可——

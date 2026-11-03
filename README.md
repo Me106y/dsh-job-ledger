@@ -31,8 +31,9 @@ dsh plugin --profile web add dsh-job-ledger
 
 ## 你能拿到什么
 
-**七个工具**（模型侧）：`job_ledger_profile` · `job_ledger_resume` · `job_ledger_discover` ·
-`job_ledger_queue` · `job_ledger_apply` · `job_ledger_reconcile` · `job_ledger_report`。
+**八个工具**（模型侧）：`job_ledger_profile` · `job_ledger_resume` · `job_ledger_discover` ·
+`job_ledger_queue` · `job_ledger_apply` · `job_ledger_reconcile` · `job_ledger_backfill` ·
+`job_ledger_report`。
 `apply` 是唯一的投递入口，面板和工具都走它。
 
 **一个面板**（三屏）：待投（勾选 + 进度）· 概览（今日已投 / 剩余额度 / 不确定 / 差异 / 昨日回复）·
