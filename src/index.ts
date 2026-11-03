@@ -14,9 +14,13 @@ import { join } from 'node:path'
 
 import { resolveConfig } from './config.ts'
 import type { ConfigInput } from './config.ts'
+import { createApplier } from './cdp/applier.ts'
+import type { BrowserPort } from './cdp/browser.ts'
+import type { Job } from './ledger/events.ts'
+import { JobRunner } from './run/executor.ts'
 import { BrowserRuntime } from './runtime/browser.ts'
 import { Ledger } from './ledger/store.ts'
-import { registerDiscoverTool, registerQueueTool, registerResumeTool } from './tools/register.ts'
+import { registerApplyTool, registerDiscoverTool, registerQueueTool, registerResumeTool } from './tools/register.ts'
 
 export { ERROR_MESSAGES, failure, isErrorCode, isFatal, isRetryable, userMessage, PluginError } from './shared/errors.ts'
 export type { ErrorCode, LedgerFailure } from './shared/errors.ts'
@@ -174,6 +178,19 @@ export {
 export type { DiscoverOptions, DiscoverToolResult, DiscoveredJob } from './tools/discover.ts'
 
 /**
+ * Greeting used until slot filling lands (PRD §5.5).
+ *
+ * ⚠️ Placeholder: the design requires BOSS's preset template plus slots whose values are quoted
+ * from the resume or the JD. This sentence fills nothing, so it is safe but not yet the product.
+ *
+ * @param job job being applied to
+ * @returns the message to type
+ */
+function defaultGreeting(job: Job): string {
+  return `你好，我对「${job.title}」这个岗位很感兴趣，方便聊聊吗？`
+}
+
+/**
  * Cordis plugin name.
  *
  * Exported as `name` for the bundle patch; see `cordis.patch.yml`.
@@ -197,9 +214,19 @@ export function apply(ctx: Context, config: ConfigInput = {}): void {
   const ledger = Ledger.open(join(resolved.dataDir, 'events.jsonl'))
   const runtime = new BrowserRuntime(resolved)
 
+  const runner = new JobRunner({
+    ledger,
+    // CdpReader implements BrowserPort; the runtime's type is the narrower reader because tests
+    // substitute a reader-only double.
+    applier: createApplier(async () => (await runtime.reader()) as BrowserPort),
+    dataDir: resolved.dataDir,
+    greeting: defaultGreeting,
+  })
+
   registerResumeTool(ctx, runtime, resolved)
   registerDiscoverTool(ctx, ledger, runtime, resolved)
   registerQueueTool(ctx, ledger)
+  registerApplyTool(ctx, runner)
 
   // One place to release both handles when the plugin is unloaded.
   ctx.effect(() => () => {

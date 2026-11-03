@@ -81,7 +81,9 @@ export const RULES: readonly Rule[] = [
   {
     id: 'no-dom-click',
     applies: (file) => under(file, 'src'),
-    match: (line) => /\.click\s*\(/.test(line),
+    // A DOM click takes no argument. `port.click(selector)` is our own real-input API, not a
+    // synthetic event, so matching every `.click(` produced false positives on the applier.
+    match: (line) => /\.click\s*\(\s*\)/.test(line),
     problem: 'synthetic DOM click',
     why: 'element.click() produces an isTrusted=false event, which the platform can tell apart from a real click.',
     fix: 'click through Input.dispatchMouseEvent at the element centre, or route the action through the run layer.',
