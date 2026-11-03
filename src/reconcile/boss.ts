@@ -31,11 +31,20 @@ export interface Discrepancy {
   readonly state: string
 }
 
+/** A platform row the ledger had to be taught about. */
+export interface PlatformOnlyRow {
+  readonly externalId: string
+  readonly company: string
+  readonly title: string
+}
+
 /** What one reconciliation pass did. */
 export interface ReconcileReport {
   readonly matched: number
   readonly backfilled: number
   readonly discrepancies: readonly Discrepancy[]
+  /** Rows the ledger did not know: the panel lists them as 平台有、账本无. */
+  readonly platformOnly: readonly PlatformOnlyRow[]
   /** True when only part of the platform history was read; discrepancies may be false positives. */
   readonly partial: boolean
 }
@@ -103,6 +112,7 @@ export function reconcile(
   let matched = 0
   let backfilled = 0
   const seen = new Set<string>()
+  const platformOnly: PlatformOnlyRow[] = []
 
   for (const row of rows) {
     const existing = matchJob(ledger.projection, row)
@@ -122,6 +132,7 @@ export function reconcile(
     })
     backfilled += 1
     seen.add(job.id)
+    platformOnly.push({ externalId: row.externalId, company: row.company, title: row.title })
   }
 
   const discrepancies = findDiscrepancies(ledger.projection, seen)
@@ -138,6 +149,7 @@ export function reconcile(
     matched,
     backfilled,
     discrepancies,
+    platformOnly,
     partial: options.partial ?? false,
   }
 }

@@ -120,6 +120,8 @@ export interface Projection {
   unknownEvents: number
   /** ISO time of the last applied event. */
   lastAppliedAt?: string
+  /** Number of events applied; the panel compares it to skip redundant renders (TECH §11.4). */
+  revision: number
 }
 
 /** Key for the company+title indexes. `\u0001` cannot appear in normalized text. */
@@ -146,6 +148,7 @@ export function createProjection(): Projection {
     appsByCompanyTitle: new Map(),
     reached: new Map(),
     unknownEvents: 0,
+    revision: 0,
   }
 }
 
@@ -313,6 +316,7 @@ export function applyEvent(projection: Projection, event: LedgerEvent): void {
     }
   }
   projection.lastAppliedAt = event.at
+  projection.revision += 1
 }
 
 // Entity-state problems are not disk failures: using E_LEDGER_WRITE here told the user to check
