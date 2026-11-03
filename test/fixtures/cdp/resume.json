@@ -1,0 +1,47 @@
+{
+  "baseinfo": {
+    "code": 0,
+    "message": "Success",
+    "zpData": {
+      "name": "张三",
+      "workYearDesc": "5年",
+      "degreeCategory": "本科",
+      "skillList": [{ "skillName": "Go" }, { "skillName": "Kubernetes" }, { "skillName": "MySQL" }],
+      "workExpList": [
+        {
+          "companyName": "字节跳动",
+          "positionName": "后端工程师",
+          "startDate": "2021-07",
+          "endDate": "至今"
+        },
+        {
+          "companyName": "某创业公司",
+          "positionName": "服务端开发",
+          "startDate": "2019-06",
+          "endDate": "2021-06"
+        }
+      ]
+    }
+  },
+  "expect": {
+    "code": 0,
+    "message": "Success",
+    "zpData": {
+      "expectList": [
+        {
+          "positionName": "后端工程师",
+          "cityName": "深圳",
+          "salaryMin": 25,
+          "salaryMax": 35
+        }
+      ]
+    }
+  },
+  "status": {
+    "code": 0,
+    "message": "Success",
+    "zpData": {
+      "completePercent": 85
+    }
+  }
+}
