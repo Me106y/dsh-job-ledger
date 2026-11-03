@@ -113,10 +113,14 @@ export const RULES: readonly Rule[] = [
   {
     id: 'single-writer',
     applies: (file) => under(file, 'src') && file !== 'src/ledger/store.ts',
-    match: (line) => /\b(writeFileSync|appendFileSync|createWriteStream|writeSync)\s*\(/.test(line),
-    problem: 'a second writer to a file',
+    // Append-style writes are always the ledger. `writeFileSync` is how standalone artifacts
+    // (evidence screenshots) are written, so it only counts when the target is the log itself.
+    match: (line) =>
+      /\b(appendFileSync|createWriteStream|writeSync)\s*\(/.test(line) ||
+      /\bwriteFileSync\s*\(.*(events|jsonl)/.test(line),
+    problem: 'a second writer to the ledger',
     why: 'TECH §6.2 requires one writer; a second descriptor is how two orders of events become possible.',
-    fix: 'append through the Ledger instance (ledger.append) instead of touching the filesystem.',
+    fix: 'append through the Ledger instance (ledger.append) instead of touching the log file.',
   },
   {
     id: 'no-native-dependency',
