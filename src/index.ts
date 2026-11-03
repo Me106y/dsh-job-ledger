@@ -9,6 +9,13 @@
  * @module dsh-job-ledger
  */
 
+import type { Context } from '@deepseek-ai/cordis'
+
+import { resolveConfig } from './config.ts'
+import type { ConfigInput } from './config.ts'
+import { BrowserRuntime } from './runtime/browser.ts'
+import { registerResumeTool } from './tools/register.ts'
+
 export { ERROR_MESSAGES, failure, isErrorCode, isFatal, isRetryable, userMessage, PluginError } from './shared/errors.ts'
 export type { ErrorCode, LedgerFailure } from './shared/errors.ts'
 
@@ -94,7 +101,14 @@ export type { Funnel, Report, SourceRow, WeekRow } from './report/build.ts'
 export { defaultDataDir, dshHome, expandHome, resolveConfig } from './config.ts'
 export type { ConfigInput, LedgerConfig } from './config.ts'
 
-export { BOSS_API, BOSS_BUSINESS_CODES, BOSS_URLS, BOSS_VERSION, bossErrorCode } from './cdp/boss.ts'
+export {
+  BOSS_API,
+  BOSS_BUSINESS_CODES,
+  BOSS_URLS,
+  BOSS_VERSION,
+  bossErrorCode,
+  isLoginUrl,
+} from './cdp/boss.ts'
 export { CdpReader, NAVIGATE_TIMEOUT_MS } from './cdp/browser.ts'
 export type { BrowserReader } from './cdp/browser.ts'
 export {
@@ -120,25 +134,40 @@ export type {
 export { assertBossSuccess, readResume } from './resume/read.ts'
 export { redactResume } from './resume/redact.ts'
 
-/** Cordis plugin name. */
+export { BrowserRuntime } from './runtime/browser.ts'
+export type { BrowserRuntimeDeps, ReaderProvider } from './runtime/browser.ts'
+
+export {
+  RESUME_TOOL_DESCRIPTION,
+  RESUME_TOOL_NAME,
+  readResumeForModel,
+  renderResumeResult,
+} from './tools/resume.ts'
+export type { JsonLike, ResumeToolResult } from './tools/resume.ts'
+export { registerResumeTool, resumeTool } from './tools/register.ts'
+
+/**
+ * Cordis plugin name.
+ *
+ * Exported as `name` for the bundle patch; see `cordis.patch.yml`.
+ */
 export const name = 'job-ledger'
 
-/** Services this plugin needs. Empty until P1/P5 wire the ledger and the panel. */
-export const inject: readonly string[] = []
-
-/** The slice of the cordis context this skeleton uses. */
-export interface PluginContext {
-  readonly logger: {
-    info(message: string): void
-    warn(message: string): void
-  }
-}
+/** Services this plugin needs. `tools` is required because the resume tool registers on it. */
+export const inject: readonly string[] = ['tools']
 
 /**
  * Mount the plugin.
  *
- * @param ctx host context
+ * The browser is opened lazily on the first tool call, not here: installing the plugin must not
+ * launch Chrome behind the user's back.
+ *
+ * @param ctx host context (needs the `tools` service)
+ * @param config user configuration from `cordis.patch.yml`
  */
-export function apply(ctx: PluginContext): void {
-  ctx.logger.info('dsh-job-ledger: P0 ledger core built; Chrome/CDP lands at P1')
+export function apply(ctx: Context, config: ConfigInput = {}): void {
+  const resolved = resolveConfig(config)
+  const runtime = new BrowserRuntime(resolved)
+  registerResumeTool(ctx, runtime, resolved)
+  ctx.logger.info(`dsh-job-ledger: resume tool registered (dataDir: ${resolved.dataDir})`)
 }

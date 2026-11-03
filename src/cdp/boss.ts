@@ -55,3 +55,16 @@ export const BOSS_BUSINESS_CODES: Readonly<Record<number, ErrorCode>> = {
 export function bossErrorCode(code: number): ErrorCode | undefined {
   return BOSS_BUSINESS_CODES[code]
 }
+
+/**
+ * Whether a URL means "you are not logged in".
+ *
+ * BOSS redirects an expired session to a user/login page instead of answering 401, so after a
+ * navigation this is the only cheap check that separates "logged out" from "page still loading".
+ *
+ * @param url page URL
+ * @returns whether the page is the login wall
+ */
+export function isLoginUrl(url: string): boolean {
+  return /\/web\/user\/|\/login/i.test(url)
+}

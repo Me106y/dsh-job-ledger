@@ -1,0 +1,88 @@
+/**
+ * Owns the browser across tool calls.
+ *
+ * Launching Chrome is slow and the login only exists in that one profile, so the reader is created
+ * once and reused. Two calls arriving together must not race into two launches, hence the shared
+ * in-flight promise rather than a boolean.
+ *
+ * @module dsh-job-ledger/runtime/browser
+ */
+
+import { join } from 'node:path'
+
+import { CdpReader } from '../cdp/browser.ts'
+import type { BrowserReader } from '../cdp/browser.ts'
+import { ensureChrome } from '../cdp/chrome.ts'
+import type { ChromeDeps } from '../cdp/chrome.ts'
+import type { LedgerConfig } from '../config.ts'
+
+/** Seams used by tests; production runs with the defaults. */
+export interface BrowserRuntimeDeps {
+  readonly chrome?: ChromeDeps | undefined
+  readonly openReader?: ((webSocketUrl: string) => Promise<BrowserReader>) | undefined
+}
+
+/** What the tools actually need: a reader, however it is obtained. */
+export interface ReaderProvider {
+  reader(): Promise<BrowserReader>
+}
+
+/** Lazily-opened, shared browser connection. */
+export class BrowserRuntime implements ReaderProvider {
+  readonly #config: LedgerConfig
+  readonly #deps: BrowserRuntimeDeps
+  #reader: BrowserReader | undefined
+  #opening: Promise<BrowserReader> | undefined
+  #launched: boolean | undefined
+
+  /**
+   * @param config resolved configuration (data dir, port, explicit binary)
+   * @param deps test seams
+   */
+  constructor(config: LedgerConfig, deps: BrowserRuntimeDeps = {}) {
+    this.#config = config
+    this.#deps = deps
+  }
+
+  /**
+   * Get the reader, launching and connecting on first use.
+   *
+   * @returns the shared reader
+   */
+  async reader(): Promise<BrowserReader> {
+    if (this.#reader !== undefined) return this.#reader
+    this.#opening ??= this.#open()
+    try {
+      return await this.#opening
+    } finally {
+      this.#opening = undefined
+    }
+  }
+
+  /** @returns whether this process started the browser, once it is known */
+  get launched(): boolean | undefined {
+    return this.#launched
+  }
+
+  /** Close the CDP connection. The browser itself is detached and stays open. */
+  close(): void {
+    this.#reader?.close()
+    this.#reader = undefined
+  }
+
+  async #open(): Promise<BrowserReader> {
+    const handle = await ensureChrome(
+      {
+        debugPort: this.#config.debugPort,
+        profileDir: join(this.#config.dataDir, 'chrome-profile'),
+        ...(this.#config.chromePath === '' ? {} : { chromePath: this.#config.chromePath }),
+      },
+      this.#deps.chrome ?? {},
+    )
+    this.#launched = handle.launched
+    const open = this.#deps.openReader ?? CdpReader.open
+    const reader = await open(handle.webSocketUrl)
+    this.#reader = reader
+    return reader
+  }
+}

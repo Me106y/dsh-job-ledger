@@ -67,6 +67,9 @@ export interface ResumePayloads {
 export class ReplayBrowser implements BrowserReader {
   readonly patterns: RegExp[] = []
   navigated: string | undefined
+  /** Where the fake page claims to be; tests set it to a login URL to simulate a redirect. */
+  url = 'https://www.zhipin.com/web/geek/resume'
+  closed = false
   /** Number of captures armed at the moment `navigate` was called. */
   capturesAtNavigate: number | undefined
 
@@ -96,5 +99,15 @@ export class ReplayBrowser implements BrowserReader {
   /** @returns an empty PNG */
   async screenshot(): Promise<Buffer> {
     return Buffer.alloc(0)
+  }
+
+  /** @returns the configured page URL */
+  async currentUrl(): Promise<string> {
+    return this.url
+  }
+
+  /** Mark the reader closed. */
+  close(): void {
+    this.closed = true
   }
 }

@@ -859,6 +859,7 @@ Skill 不是文档，是**约束**。每条约束都要有对应的工具侧校�
 | `E_LEDGER_VERSION` | 账本由更新版本的插件写入 | 拒绝启动，提示升级插件 |
 | `E_LEDGER_STATE` | 账本状态异常（未知 id、重复 app id、结构不完整事件） | 拒绝该操作/启动，报出实体与位置 |
 | `E_INVALID_ARGUMENT` | 参数不合法（如 ids 为空或超过单轮上限） | 拒绝该调用，报出期望范围 |
+| `E_PRIVACY_BLOCKED` | 隐私设置为 redacted | 拒绝返回原文，提示改成 full |
 
 ---
 
