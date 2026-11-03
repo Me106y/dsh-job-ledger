@@ -19,6 +19,7 @@ import type { BrowserPort } from './cdp/browser.ts'
 import type { Job } from './ledger/events.ts'
 import { JobRunner } from './run/executor.ts'
 import { fillGreeting } from './resume/greeting.ts'
+import { loadSkillBody, registerSkill } from './skill.ts'
 import { readResume } from './resume/read.ts'
 import type { Resume } from './resume/parse.ts'
 import { createApi } from './api/handlers.ts'
@@ -30,6 +31,8 @@ import { Ledger } from './ledger/store.ts'
 import {
   registerApplyTool,
   registerDiscoverTool,
+  registerProfileTool,
+  registerReportTool,
   registerQueueTool,
   registerReconcileTool,
   registerResumeTool,
@@ -252,6 +255,11 @@ export function apply(ctx: Context, config: ConfigInput = {}): void {
   registerQueueTool(ctx, ledger)
   registerApplyTool(ctx, runner)
   registerReconcileTool(ctx, ledger, runtime)
+  registerReportTool(ctx, ledger, resolved.dataDir)
+  registerProfileTool(ctx, resolved)
+
+  const skill = loadSkillBody()
+  if (skill !== undefined) registerSkill(ctx, skill)
 
   // The panel API is optional: a profile without a web server (headless) still gets the tools.
   const webServer = (ctx as unknown as { webServer?: WebServerLike }).webServer
