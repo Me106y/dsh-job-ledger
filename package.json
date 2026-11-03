@@ -37,15 +37,33 @@
     "dedupe"
   ],
   "scripts": {
-    "build": "tsdown",
+    "build": "node -e \"require('node:fs').rmSync('lib',{recursive:true,force:true})\" && tsdown",
     "typecheck": "tsc --noEmit",
     "test": "node --test \"test/**/*.test.ts\"",
     "lint:rules": "node scripts/check-rules.ts",
-    "check": "pnpm lint:rules && pnpm typecheck && pnpm test && pnpm build"
+    "check": "pnpm lint:rules && pnpm typecheck && pnpm typecheck:client && pnpm test && pnpm build",
+    "typecheck:client": "tsc --noEmit -p tsconfig.client.json"
   },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar"
+      ],
+      "external": [
+        "react",
+        "react-dom",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar"
+      ]
     }
   },
   "peerDependencies": {
@@ -70,6 +88,10 @@
     "@deepseek-ai/dsh-tools": "0.2.1-rc.5",
     "@deepseek-ai/schemastery": "~3.18.5",
     "@types/node": "^22.20.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "tsdown": "^0.22.0",
     "typescript": "^5.9.0"
   }

@@ -173,6 +173,10 @@ test/
 - CSS：`import './client.css'` 由 tsdown 注入，DSH 用设计 token（`--dsh-*`），不自造色板。
 - 开发循环：改 host 代码 → 重启 plugin（HMR 或 `ctx.fiber.restart()`）；改 client → 需要 `pnpm run dev:web` 才能免刷新，否则重建 + 刷新页面。**这个约束要写进 README**，否则每次改 UI 都会以为坏了。
 
+**实现**：`tsdown.config.ts` 导出两个配置；client 用**命名入口**，产物固定落在 `lib/client.js`（`package.json` 的
+`exports` 就是这个路径）。两个配置都设 `clean: false`，清空 `lib` 由 `build` 脚本用 node 做一次——否则两个
+并行构建会互相删产物。client 把 `react` 与 DSH 客户端包按**名字**外置，打包它们等于往页面里再塞一份 React。
+
 ---
 
 ## 4. 依赖方向
@@ -770,6 +774,9 @@ interface RunView { runId?: string; state: 'idle'|'queued'|'running'|'paused'|'h
 ## 12. 面板
 
 ### 12.1 注册
+
+**实现**：`src/client/index.tsx`。⚠️ `slots` 与 `locale` 按**结构类型**声明——DSH 客户端包是运行时由宿主提供的
+peer，本仓库没有安装它们的类型。签名若有出入，只需改这一个文件，其余都是普通 React。
 
 ```ts
 export const inject = ['slots', 'locale']
