@@ -32,7 +32,7 @@ function counter(): () => string {
 const BATCH: readonly RawJob[] = [
   { externalId: 'job_a1', title: '后端工程师', company: '字节跳动', city: '深圳' },
   // Same role, second HR: duplicate by fingerprint.
-  { externalId: 'job_a2', title: '高级后端工程师', company: '北京市字节跳动', city: '深圳市' },
+  { externalId: 'job_a2', title: '后端工程师', company: '北京市字节跳动', city: '深圳市' },
   { externalId: 'job_a3', title: '销售代表', company: '某贸易公司', city: '深圳' },
 ]
 
