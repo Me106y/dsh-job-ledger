@@ -829,6 +829,7 @@ Skill 不是文档，是**约束**。每条约束都要有对应的工具侧校�
 | `E_CDP_DISCONNECTED` | 浏览器连接断开 | 熔断 |
 | `E_LEDGER_WRITE` | 账本写入失败 | 熔断，提示检查磁盘 |
 | `E_LEDGER_VERSION` | 账本由更新版本的插件写入 | 拒绝启动，提示升级插件 |
+| `E_PRIVACY_BLOCKED` | 隐私设置为 redacted | 拒绝返回原文，提示改成 full |
 
 ---
 
