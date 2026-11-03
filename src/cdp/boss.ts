@@ -61,6 +61,13 @@ export const BOSS_API = {
  * collected here, versioned by {@link BOSS_VERSION}, so a redesign changes one file.
  */
 export const BOSS_SELECTORS = {
+  /**
+   * 登录页左上角的「APP扫码登录」开关。
+   *
+   * Verified against the real login page on 2026-11-03: the page defaults to SMS, and this element is
+   * `<div class="switch-tip">APP扫码登录</div>` inside `.btn-sign-switch.ewm-switch`.
+   */
+  loginQrSwitch: '.btn-sign-switch',
   /** 立即沟通 on the job detail page. */
   contactButton: '.btn-startchat, .op-btn-chat, a.btn-startchat',
   greetingInput: '.chat-input textarea, textarea.input-area, #chat-input',

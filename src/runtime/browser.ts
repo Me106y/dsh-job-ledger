@@ -11,7 +11,7 @@
 import { join } from 'node:path'
 
 import { CdpReader } from '../cdp/browser.ts'
-import type { BrowserReader } from '../cdp/browser.ts'
+import type { BrowserPort } from '../cdp/browser.ts'
 import { ensureChrome, findPageTarget } from '../cdp/chrome.ts'
 import type { ChromeDeps } from '../cdp/chrome.ts'
 import type { LedgerConfig } from '../config.ts'
@@ -20,7 +20,7 @@ import { PluginError } from '../shared/errors.ts'
 /** Seams used by tests; production runs with the defaults. */
 export interface BrowserRuntimeDeps {
   readonly chrome?: ChromeDeps | undefined
-  readonly openReader?: ((webSocketUrl: string) => Promise<BrowserReader>) | undefined
+  readonly openReader?: ((webSocketUrl: string) => Promise<BrowserPort>) | undefined
   /** Resolves the page target to attach to; injected in tests so no real Chrome is needed. */
   readonly pageTarget?:
     | ((port: number) => Promise<{ webSocketDebuggerUrl: string } | undefined>)
@@ -29,15 +29,15 @@ export interface BrowserRuntimeDeps {
 
 /** What the tools actually need: a reader, however it is obtained. */
 export interface ReaderProvider {
-  reader(): Promise<BrowserReader>
+  reader(): Promise<BrowserPort>
 }
 
 /** Lazily-opened, shared browser connection. */
 export class BrowserRuntime implements ReaderProvider {
   readonly #config: LedgerConfig
   readonly #deps: BrowserRuntimeDeps
-  #reader: BrowserReader | undefined
-  #opening: Promise<BrowserReader> | undefined
+  #reader: BrowserPort | undefined
+  #opening: Promise<BrowserPort> | undefined
   #launched: boolean | undefined
 
   /**
@@ -54,7 +54,7 @@ export class BrowserRuntime implements ReaderProvider {
    *
    * @returns the shared reader
    */
-  async reader(): Promise<BrowserReader> {
+  async reader(): Promise<BrowserPort> {
     if (this.#reader !== undefined) return this.#reader
     this.#opening ??= this.#open()
     try {
@@ -75,7 +75,7 @@ export class BrowserRuntime implements ReaderProvider {
     this.#reader = undefined
   }
 
-  async #open(): Promise<BrowserReader> {
+  async #open(): Promise<BrowserPort> {
     const handle = await ensureChrome(
       {
         debugPort: this.#config.debugPort,

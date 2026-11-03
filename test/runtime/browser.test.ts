@@ -4,7 +4,7 @@ import test from 'node:test'
 import type { ChromeDeps } from '../../src/cdp/chrome.ts'
 import { resolveConfig } from '../../src/config.ts'
 import { BrowserRuntime } from '../../src/runtime/browser.ts'
-import type { BrowserReader } from '../../src/cdp/browser.ts'
+import type { BrowserPort } from '../../src/cdp/browser.ts'
 import { ReplayBrowser } from '../fixtures/transports.ts'
 
 const CONFIG = resolveConfig({ dataDir: '/tmp/job-ledger-runtime-test', debugPort: 9444 })
@@ -67,12 +67,12 @@ test('the reader is reused, so a second tool call does not relaunch Chrome', asy
 
 test('two calls arriving together share one launch', async () => {
   let opens = 0
-  let resolveOpen: ((reader: BrowserReader) => void) | undefined
+  let resolveOpen: ((reader: BrowserPort) => void) | undefined
   const runtime = new BrowserRuntime(CONFIG, {
     chrome: chromeDeps(),
     pageTarget: async () => PAGE,
     openReader: () =>
-      new Promise<BrowserReader>((resolve) => {
+      new Promise<BrowserPort>((resolve) => {
         opens += 1
         resolveOpen = resolve
       }),

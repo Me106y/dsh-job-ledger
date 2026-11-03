@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { BOSS_URLS } from '../../src/cdp/boss.ts'
+import { BOSS_SELECTORS, BOSS_URLS } from '../../src/cdp/boss.ts'
 import { LOGIN_TOOL_NAME, loginForModel, renderLoginResult } from '../../src/tools/login.ts'
 import type { LoginToolOptions } from '../../src/tools/login.ts'
 import type { ReaderProvider } from '../../src/runtime/browser.ts'
@@ -41,6 +41,23 @@ test('a login wall puts the QR page in front and waits for the redirect away', a
 
   assert.deepEqual(result, { ok: true, alreadyLoggedIn: false, url: JOB })
   assert.equal(browser.navigated, BOSS_URLS.login)
+})
+
+test('the QR tab is opened, because the page defaults to SMS', async () => {
+  const { provider, browser } = providerWith([LOGIN, JOB])
+
+  await loginForModel(provider, FAST)
+
+  assert.deepEqual(browser.clicked, [BOSS_SELECTORS.loginQrSwitch])
+})
+
+test('a page without the QR tab still lets the person log in', async () => {
+  const { provider, browser } = providerWith([LOGIN, JOB])
+  browser.clickError = new PluginError('E_SELECTOR_MISSING', { what: BOSS_SELECTORS.loginQrSwitch })
+
+  const result = await loginForModel(provider, FAST)
+
+  assert.equal(result.ok, true)
 })
 
 test('a person who never scans gets a coded timeout, not a fake success', async () => {

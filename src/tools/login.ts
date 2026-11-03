@@ -9,7 +9,7 @@
  * @module dsh-job-ledger/tools/login
  */
 
-import { BOSS_URLS, isLoginUrl } from '../cdp/boss.ts'
+import { BOSS_SELECTORS, BOSS_URLS, isLoginUrl } from '../cdp/boss.ts'
 import { waitForLogin } from '../cdp/login.ts'
 import type { ReaderProvider } from '../runtime/browser.ts'
 import { PluginError, userMessage } from '../shared/errors.ts'
@@ -59,6 +59,14 @@ export async function loginForModel(
 
     // Put the QR code in front of the person: the window may be on a page that only shows a splash.
     await reader.navigate(BOSS_URLS.login)
+
+    // The page opens on SMS login; switch to the QR tab when the tab is there. A redesign must not
+    // break logging in, so a missing tab is ignored — the person can still choose SMS.
+    try {
+      await reader.click(BOSS_SELECTORS.loginQrSwitch, 2_000)
+    } catch {
+      // Best effort by design.
+    }
 
     const loggedIn = await waitForLogin(reader, {
       ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
