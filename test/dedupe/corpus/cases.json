@@ -78,7 +78,7 @@
     ],
     "candidate": {
       "company": "北京市字节跳动科技有限公司",
-      "title": "高级后端工程师",
+      "title": "后端工程师",
       "city": "深圳市",
       "jd": "负责后端服务的设计与开发，熟悉 Go 与高并发系统，参与核心交易链路的性能优化，要求五年以上经验",
       "externalId": "hr_two"
@@ -219,13 +219,13 @@
     }
   },
   {
-    "name": "bracketed urgency markers do not fork identity",
+    "name": "urgency words outside brackets do not fork identity",
     "now": "2026-11-03T00:00:00.000Z",
     "existing": [
       {
         "id": "j_1",
         "company": "阿里巴巴",
-        "title": "高级后端工程师（急招）",
+        "title": "后端工程师急招",
         "city": "深圳",
         "jd": "负责品牌营销活动策划与执行，维护社交媒体渠道，撰写宣传文案，要求具备审美与数据分析能力",
         "firstSeenAt": "2026-10-24T00:00:00.000Z"
@@ -326,7 +326,7 @@
     }
   },
   {
-    "name": "bracket-only difference collapses to one role (documented collision)",
+    "name": "a bracket qualifier is part of the role",
     "now": "2026-11-03T00:00:00.000Z",
     "existing": [
       {
@@ -345,12 +345,12 @@
       "jd": "负责后端服务的设计与开发，熟悉 Go 与高并发系统，参与核心交易链路的性能优化，要求五年以上经验"
     },
     "expect": {
-      "kind": "duplicate",
-      "reason": "same-role-company"
+      "kind": "new",
+      "reason": "new"
     }
   },
   {
-    "name": "seniority-only difference collapses to one role (documented collision)",
+    "name": "a seniority word is part of the role",
     "now": "2026-11-03T00:00:00.000Z",
     "existing": [
       {
@@ -369,8 +369,8 @@
       "jd": "负责后端服务的设计与开发，熟悉 Go 与高并发系统，参与核心交易链路的性能优化，要求五年以上经验"
     },
     "expect": {
-      "kind": "duplicate",
-      "reason": "same-role-company"
+      "kind": "new",
+      "reason": "new"
     }
   }
 ]

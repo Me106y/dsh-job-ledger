@@ -41,7 +41,7 @@ test('job/add keeps two postings that share a fingerprint', () => {
   const first = addJob(projection, { company: '字节跳动', title: '后端工程师', city: '深圳' })
   const second = addJob(projection, {
     company: '北京市字节跳动',
-    title: '高级后端工程师',
+    title: '后端工程师',
     city: '深圳市',
     externalId: 'other-hr',
   })

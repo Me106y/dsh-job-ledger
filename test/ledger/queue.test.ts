@@ -32,7 +32,7 @@ function counter(): () => string {
 
 const BATCH: readonly RawJob[] = [
   { externalId: 'job_a1', title: '后端工程师', company: '字节跳动', city: '深圳', salaryRaw: '25-35K' },
-  { externalId: 'job_a2', title: '高级后端工程师', company: '北京市字节跳动', city: '深圳市' },
+  { externalId: 'job_a2', title: '后端工程师', company: '北京市字节跳动', city: '深圳市' },
   { externalId: 'job_a3', title: '销售代表', company: '某贸易公司', city: '深圳' },
 ]
 
@@ -58,9 +58,11 @@ test('a duplicate never shows up in any queue', (t) => {
   const ledger = tempLedger(t)
   ingestJobs(ledger, BATCH, { now: NOW, newId: counter() })
 
+  // The duplicate is not even recorded, so it cannot leak into a queue.
+  const stored = [...ledger.projection.jobs.values()].map((job) => job.externalId)
+  assert.deepEqual(stored.sort(), ['job_a1', 'job_a3'])
   for (const filter of ['new', 'suspect', 'filtered'] as const) {
-    const rows = queueRows(ledger.projection, filter)
-    assert.ok(rows.every((row) => row.title !== '高级后端工程师'))
+    assert.equal(queueRows(ledger.projection, filter).length, filter === 'new' ? 1 : filter === 'filtered' ? 1 : 0)
   }
 })
 

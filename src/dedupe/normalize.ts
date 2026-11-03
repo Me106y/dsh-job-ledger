@@ -26,23 +26,14 @@ const COMPANY_NOISE: readonly string[] = [
   '控股',
 ]
 
-/** Seniority and urgency words stripped from job titles. */
-const TITLE_NOISE: readonly string[] = [
-  '高级',
-  '资深',
-  '中级',
-  '初级',
-  '专家',
-  '首席',
-  '见习',
-  'senior',
-  'junior',
-  'lead',
-  '急招',
-  '急聘',
-  '双休',
-  '五险一金',
-]
+/**
+ * Urgency words stripped from job titles.
+ *
+ * Seniority words (高级/资深/senior/lead…) and parenthesized qualifiers are **not** here: product
+ * decision #29 (PRD §15) treats them as part of the role's identity. Dropping them merged
+ * 「后端工程师（Java）」with「后端工程师（Go）」，which silently killed one of them.
+ */
+const TITLE_NOISE: readonly string[] = ['急招', '急聘', '双休', '五险一金']
 
 /** Cities that mean "location does not restrict this job". */
 const REMOTE_WORDS: ReadonlySet<string> = new Set(['远程', '全国', '不限', 'remote', '线上'])
@@ -88,18 +79,19 @@ export function normalizeCompany(raw: string): string {
 /**
  * Normalize a job title.
  *
- * Known side effect: 「高级后端工程师（急招）」→「后端工程师」. A parenthesized qualifier is dropped
- * wholesale, on the theory that it is a modifier rather than the role.
+ * Parentheses stay (`后端工程师（Java）` and `后端工程师（Go）` are two jobs — decision #29), and so do
+ * seniority words; only urgency noise and the trailing 岗位/职位 are removed.
  *
  * @param raw job title
  * @returns normalized title
  */
 export function normalizeTitle(raw: string): string {
   let text = fold(raw)
-  text = text.replace(/[（(【[][^）)】\]]*[）)】\]]/g, '')
   for (const noise of TITLE_NOISE) {
     text = text.split(noise).join('')
   }
+  // Removing「急招」from「后端工程师（急招）」leaves an empty pair; it is noise, not identity.
+  text = text.replace(/[（(【[]\s*[）)】\]]/g, '')
   text = text.replace(/(岗位|职位)$/g, '')
   return text.replace(/\s+/g, '')
 }

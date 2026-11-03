@@ -29,18 +29,20 @@ test('company: case and whitespace are folded', () => {
   assert.equal(normalizeCompany('Acme Corp'), 'acmecorp')
 })
 
-test('title: seniority, urgency and parentheses are dropped', () => {
-  assert.equal(normalizeTitle('高级后端工程师（急招）'), '后端工程师')
-  assert.equal(normalizeTitle('资深 Golang 开发'), 'golang开发')
-  assert.equal(normalizeTitle('Senior Backend Engineer'), 'backendengineer')
-  assert.equal(normalizeTitle('Backend Engineer'), 'backendengineer')
+test('title: urgency noise and the role suffix are dropped', () => {
+  assert.equal(normalizeTitle('后端工程师（急招）'), '后端工程师')
+  assert.equal(normalizeTitle('资深 Golang 开发'), '资深golang开发')
   assert.equal(normalizeTitle('后端工程师岗位'), '后端工程师')
-  assert.equal(normalizeTitle('见习产品经理【双休】'), '产品经理')
+  assert.equal(normalizeTitle('见习产品经理【双休】'), '见习产品经理')
 })
 
-test('title: bracketed content never becomes part of the identity', () => {
-  assert.equal(normalizeTitle('数据分析师(外包)'), '数据分析师')
-  assert.equal(normalizeTitle('数据分析师'), '数据分析师')
+test('title: brackets and seniority words are part of the role (decision #29)', () => {
+  // 「后端工程师（Java）」and「后端工程师（Go）」are two jobs, not one.
+  assert.notEqual(normalizeTitle('后端工程师（Java）'), normalizeTitle('后端工程师（Go）'))
+  // 高级 and 初级 are different roles.
+  assert.notEqual(normalizeTitle('高级后端工程师'), normalizeTitle('后端工程师'))
+  // The qualifier itself survives normalization.
+  assert.equal(normalizeTitle('数据分析师(外包)'), '数据分析师(外包)')
 })
 
 test('city: suffixes are removed and remote collapses to one value', () => {
