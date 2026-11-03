@@ -21,6 +21,16 @@ const BITS = 64
 /** Hex chars needed to carry 64 bits. */
 const HEX_LENGTH = 16
 
+/**
+ * Fewer tokens than this and the hash is not comparable.
+ *
+ * A real JD is 500–2000 characters, which yields hundreds of bigrams; a placeholder like `面议`
+ * yields one, and two unrelated placeholders can land within the Hamming threshold by accident.
+ * Returning `''` makes such a posting "no JD", which falls back to fingerprint dedupe — the
+ * conservative direction. ⚠️ The exact cut-off is a guess until real JDs are captured (TECH §20).
+ */
+export const MIN_JD_TOKENS = 20
+
 /** Returned by {@link hammingDistance} when either side has no JD: as far apart as possible. */
 export const NO_JD_DISTANCE = BITS
 
@@ -55,7 +65,7 @@ export function tokenize(text: string): string[] {
  */
 export function simhash(text: string): string {
   const tokens = tokenize(text)
-  if (tokens.length === 0) return ''
+  if (tokens.length < MIN_JD_TOKENS) return ''
 
   const vector = new Array<number>(BITS).fill(0)
   for (const token of tokens) {

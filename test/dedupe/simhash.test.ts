@@ -24,6 +24,12 @@ test('simhash is empty for text with no usable tokens', () => {
   assert.equal(hasJd(''), false)
 })
 
+test('a placeholder JD is not comparable', () => {
+  // Two unrelated one-word postings can land within the Hamming threshold by accident.
+  assert.equal(simhash('面议'), '')
+  assert.equal(hasJd(simhash('面议')), false)
+})
+
 test('simhash is deterministic and 16 hex chars wide', () => {
   const first = simhash(JD_BACKEND)
   const second = simhash(JD_BACKEND)
