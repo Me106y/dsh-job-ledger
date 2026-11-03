@@ -20,6 +20,7 @@ import { JobRunner } from './run/executor.ts'
 import { fillGreeting } from './resume/greeting.ts'
 import { loadSkillBody, registerSkill } from './skill.ts'
 import { weeklySnapshot } from './report/snapshot.ts'
+import { recoverInterrupted } from './run/recovery.ts'
 import { readResume } from './resume/read.ts'
 import type { Resume } from './resume/parse.ts'
 import { createApi } from './api/handlers.ts'
@@ -273,6 +274,9 @@ export function apply(ctx: Context, config: ConfigInput = {}): void {
     const tracker = createRunTracker()
     mountApi(webServer, createApi({ ledger, runner, provider: runtime, tracker }))
   }
+
+  // A process that died mid-application left `applying` behind, which does not block a retry.
+  recoverInterrupted(ledger)
 
   // Weekly, idempotent, and best-effort: a read-only data directory must not stop the plugin.
   try {

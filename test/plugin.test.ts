@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { existsSync, mkdtempSync, rmSync, statSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { apply, name } from '../src/index.ts'
+import { Ledger } from '../src/ledger/store.ts'
+import { makeApp, makeJob } from './fixtures/helpers.ts'
 import type { ToolDefinition } from '@deepseek-ai/dsh-tools'
 
 /**
@@ -137,4 +139,25 @@ test('the report tool renders Markdown through the registry', async (t) => {
 
   assert.equal(result.ok, true)
   assert.match(result.markdown, /## 漏斗/)
+})
+
+test('mounting recovers an application interrupted mid-run', (t) => {
+  const dir = dataDir(t, 'recover')
+  const seed = Ledger.open(join(dir, 'events.jsonl'))
+  const job = makeJob({ id: 'j_1', company: '字节跳动', title: '后端工程师', city: '深圳' })
+  seed.append({ type: 'job/add', job, at: '2026-11-03T00:00:00.000Z' })
+  seed.append({ type: 'app/create', app: makeApp(job.id, 'applying'), at: '2026-11-03T00:00:00.000Z' })
+  seed.close()
+
+  const { ctx, dispose } = context()
+  t.after(dispose)
+  apply(ctx as never, { dataDir: dir })
+
+  const lines = readFileSync(join(dir, 'events.jsonl'), 'utf8')
+    .trim()
+    .split('\n')
+    .map((line) => JSON.parse(line) as { type: string; state?: string })
+  const recovered = lines.find((event) => event.type === 'app/state')
+
+  assert.equal(recovered?.state, 'uncertain')
 })
