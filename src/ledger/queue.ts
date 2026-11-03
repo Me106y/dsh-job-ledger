@@ -9,10 +9,16 @@
  * decision event, and listing one as "new" would invite an application to something already applied
  * to — the exact failure this product exists to prevent.
  *
+ * The same reasoning applies to a job that already has a live attempt: the verdict does not change
+ * when an application goes out, so without this check every applied job would stay in the queue
+ * forever and the panel would keep offering it. Rows whose job is blocked by an application (or a
+ * live lease) are omitted; `failed` is not blocking, so a failed job comes back for a retry.
+ *
  * @module dsh-job-ledger/ledger/queue
  */
 
 import type { JobSource } from './events.ts'
+import { activeLease, blockingAppForJob } from './project.ts'
 import type { Projection } from './project.ts'
 
 /** Which slice of the queue to read. */
@@ -51,12 +57,14 @@ function matches(decision: string, status: string, filter: QueueFilter): boolean
  * @param projection ledger state
  * @param filter which slice
  * @param limit page size
+ * @param now epoch ms, for the lease check
  * @returns rows, capped at `limit`
  */
 export function queueRows(
   projection: Projection,
   filter: QueueFilter = 'new',
   limit: number = QUEUE_LIMIT,
+  now: number = Date.now(),
 ): QueueRow[] {
   const rows: QueueRow[] = []
 
@@ -65,6 +73,9 @@ export function queueRows(
     if (verdict === undefined) continue
     const decision = verdict.decision
     if (!matches(decision, job.status, filter)) continue
+    // Already applied to, or being applied to right now: not a candidate.
+    if (blockingAppForJob(projection, job.id) !== undefined) continue
+    if (activeLease(projection, job.id, now) !== undefined) continue
     rows.push({
       jobId: job.id,
       title: job.title,
@@ -89,13 +100,20 @@ export function queueRows(
 }
 
 /**
- * @param projection ledger state @param filter which slice @returns how many rows exist before capping
+ * @param projection ledger state @param filter which slice @param now epoch ms @returns how many rows exist before capping
  */
-export function queueTotal(projection: Projection, filter: QueueFilter = 'new'): number {
+export function queueTotal(
+  projection: Projection,
+  filter: QueueFilter = 'new',
+  now: number = Date.now(),
+): number {
   let total = 0
   for (const job of projection.jobs.values()) {
     const verdict = projection.decisions.get(job.id)
-    if (verdict !== undefined && matches(verdict.decision, job.status, filter)) total += 1
+    if (verdict === undefined || !matches(verdict.decision, job.status, filter)) continue
+    if (blockingAppForJob(projection, job.id) !== undefined) continue
+    if (activeLease(projection, job.id, now) !== undefined) continue
+    total += 1
   }
   return total
 }
