@@ -59,6 +59,63 @@ function delay(ms: number): Promise<void> {
 export const NAVIGATE_TIMEOUT_MS = 20_000
 
 /**
+ * Extract the current URL from a `Page.getNavigationHistory` result.
+ *
+ * Kept pure so the fallback logic is testable without a browser: the point of using history at all
+ * is that a blocked renderer cannot answer, which is exactly the case a test double would miss.
+ *
+ * @param history CDP result
+ * @returns the URL, or undefined when the result is unusable
+ */
+export function navigationUrl(history: {
+  readonly currentIndex?: number | undefined
+  readonly entries?: readonly { readonly url?: string | undefined }[] | undefined
+}): string | undefined {
+  const index = history.currentIndex ?? -1
+  if (index < 0) return undefined
+  const url = history.entries?.[index]?.url
+  return typeof url === 'string' && url !== '' ? url : undefined
+}
+
+/** How long to let a page settle after the main frame committed. */
+const NAVIGATE_SETTLE_MS = 800
+
+/**
+ * Resolve when any of the named events arrives.
+ *
+ * `load` is not enough on its own: a first visit to a site with slow third-party resources can leave
+ * it pending far longer than a person would wait, while the document is already navigable.
+ *
+ * @param session CDP session
+ * @param methods event names, in no particular order
+ * @param timeoutMs budget
+ * @returns the event that arrived
+ */
+function waitForAnyEvent(
+  session: CdpSession,
+  methods: readonly string[],
+  timeoutMs: number,
+): Promise<CdpEvent> {
+  return new Promise((resolve, reject) => {
+    const offs: (() => void)[] = []
+    const timer = setTimeout(() => {
+      for (const off of offs) off()
+      reject(new PluginError('E_NAV_TIMEOUT', { what: methods.join(' / ') }))
+    }, timeoutMs)
+
+    for (const method of methods) {
+      offs.push(
+        session.on(method, (params) => {
+          clearTimeout(timer)
+          for (const off of offs) off()
+          resolve({ method, params })
+        }),
+      )
+    }
+  })
+}
+
+/**
  * @param session CDP session
  * @param method event name
  * @param timeoutMs budget
@@ -120,10 +177,20 @@ export class CdpReader implements BrowserPort {
    * @param url target page
    */
   async navigate(url: string): Promise<void> {
-    const loaded = waitForEvent(this.#session, 'Page.loadEventFired', NAVIGATE_TIMEOUT_MS)
     // Arm the wait before navigating: a fast page can fire `load` before the call resolves.
+    const settled = waitForAnyEvent(
+      this.#session,
+      ['Page.loadEventFired', 'Page.frameNavigated'],
+      NAVIGATE_TIMEOUT_MS,
+    )
     await this.#session.call('Page.navigate', { url }, NAVIGATE_TIMEOUT_MS)
-    await loaded
+    const event = await settled
+
+    // A committed frame only means "started"; give the document a moment to become usable. `load`
+    // needs no such grace period.
+    if (event.method === 'Page.frameNavigated') {
+      await new Promise<void>((resolve) => setTimeout(resolve, NAVIGATE_SETTLE_MS))
+    }
   }
 
   /**
@@ -142,12 +209,27 @@ export class CdpReader implements BrowserPort {
   /**
    * Read the live location, so a redirect to the login wall is detectable.
    *
+   * The browser reports navigation history without asking the renderer, which matters on pages
+   * whose main thread is blocked (BOSS's anti-bot scripts are one): `Runtime.evaluate` can hang
+   * there, while `Page.getNavigationHistory` still answers. The evaluate path stays as a fallback.
+   *
    * @returns the current page URL
    */
   async currentUrl(): Promise<string> {
+    try {
+      const history = await this.#session.call<{
+        currentIndex?: number
+        entries?: { url?: string }[]
+      }>('Page.getNavigationHistory', {}, 3_000)
+      const url = navigationUrl(history)
+      if (url !== undefined) return url
+    } catch {
+      // Fall through: a browser that answers evaluate but not history still works.
+    }
+
     const result = await this.#session.call<{
       result?: { value?: unknown }
-    }>('Runtime.evaluate', { expression: 'location.href', returnByValue: true })
+    }>('Runtime.evaluate', { expression: 'location.href', returnByValue: true }, 5_000)
     const value = result.result?.value
     if (typeof value !== 'string') {
       throw new PluginError('E_BODY_UNAVAILABLE', { what: 'location.href' })

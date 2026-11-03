@@ -12,14 +12,19 @@ import { join } from 'node:path'
 
 import { CdpReader } from '../cdp/browser.ts'
 import type { BrowserReader } from '../cdp/browser.ts'
-import { ensureChrome } from '../cdp/chrome.ts'
+import { ensureChrome, findPageTarget } from '../cdp/chrome.ts'
 import type { ChromeDeps } from '../cdp/chrome.ts'
 import type { LedgerConfig } from '../config.ts'
+import { PluginError } from '../shared/errors.ts'
 
 /** Seams used by tests; production runs with the defaults. */
 export interface BrowserRuntimeDeps {
   readonly chrome?: ChromeDeps | undefined
   readonly openReader?: ((webSocketUrl: string) => Promise<BrowserReader>) | undefined
+  /** Resolves the page target to attach to; injected in tests so no real Chrome is needed. */
+  readonly pageTarget?:
+    | ((port: number) => Promise<{ webSocketDebuggerUrl: string } | undefined>)
+    | undefined
 }
 
 /** What the tools actually need: a reader, however it is obtained. */
@@ -80,8 +85,16 @@ export class BrowserRuntime implements ReaderProvider {
       this.#deps.chrome ?? {},
     )
     this.#launched = handle.launched
+
+    // Page commands require a page target; the browser-level socket rejects `Page.enable`.
+    const findTarget = this.#deps.pageTarget ?? findPageTarget
+    const page = await findTarget(handle.port)
+    if (page === undefined) {
+      throw new PluginError('E_CDP_DISCONNECTED', { what: 'no page target in the debugged Chrome' })
+    }
+
     const open = this.#deps.openReader ?? CdpReader.open
-    const reader = await open(handle.webSocketUrl)
+    const reader = await open(page.webSocketDebuggerUrl)
     this.#reader = reader
     return reader
   }
