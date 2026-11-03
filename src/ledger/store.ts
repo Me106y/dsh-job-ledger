@@ -114,8 +114,22 @@ export function replay(raw: Buffer): ReplayResult {
       continue
     }
 
+    const missing = missingField(parsed as Record<string, unknown>, parsed.type)
+    if (missing !== undefined) {
+      throw new PluginError('E_LEDGER_STATE', {
+        what: `line ${String(index + 1)} is a ${parsed.type} event without ${missing}`,
+      })
+    }
+
     const event = parsed as LedgerEvent
-    applyEvent(projection, event)
+    try {
+      applyEvent(projection, event)
+    } catch (error) {
+      if (error instanceof PluginError) throw error
+      throw new PluginError('E_LEDGER_STATE', {
+        what: `line ${String(index + 1)} could not be applied: ${error instanceof Error ? error.message : String(error)}`,
+      })
+    }
     appliedLines += 1
     validBytes += lineBytes
   }
@@ -141,6 +155,39 @@ function isEnvelope(value: unknown): value is { v: number; at: string; type: str
     typeof candidate.at === 'string' &&
     typeof candidate.type === 'string'
   )
+}
+
+/**
+ * Fields each event type must carry for replay to mean anything.
+ *
+ * Replay trusts the writer, but a hand-edited or half-written line is exactly the case the ledger
+ * must refuse rather than crash on. Checking the envelope here turns a TypeError deep inside the
+ * projection into a coded error naming the line.
+ */
+const REQUIRED_FIELDS: Readonly<Record<string, readonly string[]>> = {
+  'profile/set': ['profile'],
+  'job/add': ['job'],
+  'job/decision': ['jobId', 'decision', 'reason'],
+  'job/status': ['jobId', 'status'],
+  'app/create': ['app'],
+  'app/state': ['appId', 'state'],
+  'lease/grant': ['jobId', 'owner', 'expiresAt'],
+  'lease/release': ['jobId'],
+  'ingest/summary': ['added', 'duplicates', 'filtered', 'invalid'],
+  'reconcile/summary': ['matched', 'backfilled', 'discrepancies'],
+  'run/start': ['runId', 'ids', 'grantedBy'],
+  'run/halt': ['runId', 'reason'],
+  'run/end': ['runId', 'summary'],
+}
+
+/**
+ * @param event parsed event with a known type @returns the first missing required field, if any
+ */
+function missingField(event: Record<string, unknown>, type: string): string | undefined {
+  for (const field of REQUIRED_FIELDS[type] ?? []) {
+    if (event[field] === undefined) return field
+  }
+  return undefined
 }
 
 /** What `open` discovered about the existing file. */
@@ -191,17 +238,38 @@ export class Ledger {
       throw new PluginError('E_LEDGER_WRITE', { what: String(error) })
     }
 
-    const raw = existsSync(file) ? readFileSync(file) : Buffer.alloc(0)
+    let raw: Buffer
+    try {
+      raw = existsSync(file) ? readFileSync(file) : Buffer.alloc(0)
+    } catch (error) {
+      throw new PluginError('E_LEDGER_WRITE', { what: String(error) })
+    }
+
     const result = replay(raw)
-    const fd = openSync(file, 'a')
-    if (result.validBytes < raw.length) {
-      ftruncateSync(fd, result.validBytes)
-      fsyncSync(fd)
-    } else if (result.needsNewline) {
-      // The log ends mid-line (crash after the last byte). Start a fresh line so the next event
-      // is not concatenated onto the previous one.
-      writeSync(fd, '\n')
-      fsyncSync(fd)
+
+    let fd: number
+    try {
+      fd = openSync(file, 'a')
+    } catch (error) {
+      throw new PluginError('E_LEDGER_WRITE', { what: String(error) })
+    }
+
+    // Repairing the tail can fail halfway; without this the descriptor leaks and the caller gets a
+    // bare errno instead of a code it can act on.
+    try {
+      if (result.validBytes < raw.length) {
+        ftruncateSync(fd, result.validBytes)
+        fsyncSync(fd)
+      } else if (result.needsNewline) {
+        // The log ends mid-line (crash after the last byte). Start a fresh line so the next event
+        // is not concatenated onto the previous one.
+        writeSync(fd, '\n')
+        fsyncSync(fd)
+      }
+    } catch (error) {
+      closeSync(fd)
+      if (error instanceof PluginError) throw error
+      throw new PluginError('E_LEDGER_WRITE', { what: String(error) })
     }
     return new Ledger(
       file,
@@ -241,9 +309,19 @@ export class Ledger {
     applyEvent(this.projection, event)
 
     try {
-      writeSync(this.#fd, `${line}\n`)
+      const payload = `${line}\n`
+      const expected = Buffer.byteLength(payload)
+      const written = writeSync(this.#fd, payload)
+      // A short write is not a success: the line on disk would be truncated, and fsync would make
+      // that truncation durable.
+      if (written !== expected) {
+        throw new PluginError('E_LEDGER_WRITE', {
+          what: `short write: ${String(written)} of ${String(expected)} bytes`,
+        })
+      }
       fsyncSync(this.#fd)
     } catch (error) {
+      if (error instanceof PluginError) throw error
       throw new PluginError('E_LEDGER_WRITE', { what: String(error) })
     }
     return event
