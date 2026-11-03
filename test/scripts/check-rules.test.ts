@@ -52,9 +52,18 @@ test('a client importing host code is caught', () => {
   assert.deepEqual(fired('src/client/queue.tsx', "import type { Api } from '../api/contract.ts'"), [])
 })
 
-test('a second writer is caught anywhere but the store', () => {
+test('a second writer to the ledger is caught anywhere but the store', () => {
   assert.deepEqual(fired('src/discover/ingest.ts', "appendFileSync(path, line)"), ['single-writer'])
+  assert.deepEqual(fired('src/discover/ingest.ts', "writeFileSync(eventsPath, line)"), ['single-writer'])
   assert.deepEqual(fired('src/ledger/store.ts', "writeSync(fd, line)"), [])
+})
+
+test('writing a standalone artifact is not a second ledger writer', () => {
+  // Evidence screenshots are their own files; the rule is about the append-only log.
+  assert.deepEqual(
+    fired('src/run/evidence.ts', "writeFileSync(join(directory, `${appId}.png`), png, { mode: 0o600 })"),
+    [],
+  )
 })
 
 test('native and heavyweight dependencies are caught', () => {
