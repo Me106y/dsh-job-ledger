@@ -13,7 +13,7 @@
 - **技术栈**：TypeScript（ESM / strict）· Node 22 或 24 的内置能力（`child_process` 起 Chrome、原生 `fetch`、原生 `WebSocket` 说 CDP）· `node:test` · tsdown · pnpm。
 - **数据**：`$DSH_HOME/job-ledger/` 下的 `events.jsonl`（只追加），不出本机。
 
-**当前状态：按里程碑推进中，进度以 `docs/PRD.md` §12 与 PR 列表为准。**
+**当前状态：P0–P6 的代码与自动化测试已完成；真机验证进行中——进度与已验证/未验证清单见 `docs/PRD.md` §12 与 `docs/SMOKE.md`。**
 `docs/TECH-DESIGN.md §3.2` 是**目标**目录结构：动手前先 `ls src/`，不要假设某个模块已经存在。
 
 ## 仓库里真实存在什么
