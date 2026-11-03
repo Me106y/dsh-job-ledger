@@ -21,6 +21,10 @@ import { JobRunner } from './run/executor.ts'
 import { fillGreeting } from './resume/greeting.ts'
 import { readResume } from './resume/read.ts'
 import type { Resume } from './resume/parse.ts'
+import { createApi } from './api/handlers.ts'
+import { mountApi } from './api/mount.ts'
+import type { WebServerLike } from './api/mount.ts'
+import { createRunTracker } from './api/views.ts'
 import { BrowserRuntime } from './runtime/browser.ts'
 import { Ledger } from './ledger/store.ts'
 import {
@@ -248,6 +252,13 @@ export function apply(ctx: Context, config: ConfigInput = {}): void {
   registerQueueTool(ctx, ledger)
   registerApplyTool(ctx, runner)
   registerReconcileTool(ctx, ledger, runtime)
+
+  // The panel API is optional: a profile without a web server (headless) still gets the tools.
+  const webServer = (ctx as unknown as { webServer?: WebServerLike }).webServer
+  if (webServer !== undefined) {
+    const tracker = createRunTracker()
+    mountApi(webServer, createApi({ ledger, runner, provider: runtime, tracker }))
+  }
 
   // One place to release both handles when the plugin is unloaded.
   ctx.effect(() => () => {

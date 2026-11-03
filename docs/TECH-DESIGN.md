@@ -705,6 +705,10 @@ if (ledgerSaysRejected && platformHas) /* 不动 */
 - 响应统一 `application/json; charset=utf-8`；
 - 失败：HTTP 状态 + `{ error: string, code: ErrorCode, values?: Record<string,string> }`。
 
+**挂载**：`src/api/mount.ts` 注册**一条** `kind: 'prefix'` 路由 `/job-ledger/api`，handler 直接持有 Node 响应：
+读 body（上限 64KB）、解析 JSON、写 `application/json`。没有 web server 的 profile（headless）不挂载，
+工具照常工作——面板不是前置条件。
+
 ### 11.2 契约（type-only，client 与 host 共用）
 
 ```ts
