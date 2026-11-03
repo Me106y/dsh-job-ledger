@@ -42,7 +42,8 @@
     "test": "node --test \"test/**/*.test.ts\"",
     "lint:rules": "node scripts/check-rules.ts",
     "check": "pnpm lint:rules && pnpm typecheck && pnpm typecheck:client && pnpm test && pnpm build",
-    "typecheck:client": "tsc --noEmit -p tsconfig.client.json"
+    "typecheck:client": "tsc --noEmit -p tsconfig.client.json",
+    "smoke:cdp": "node scripts/smoke-cdp.ts"
   },
   "dsh": {
     "bundle": {
