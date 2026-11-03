@@ -8,36 +8,11 @@
  * @module dsh-job-ledger/resume/read
  */
 
-import { BOSS_API, BOSS_URLS, bossErrorCode, isLoginUrl } from '../cdp/boss.ts'
+import { BOSS_API, BOSS_URLS, assertBossSuccess } from '../cdp/boss.ts'
+import { assertLoggedIn } from '../cdp/login.ts'
 import type { BrowserReader } from '../cdp/browser.ts'
-import { PluginError } from '../shared/errors.ts'
 import { parseResume } from './parse.ts'
 import type { Resume } from './parse.ts'
-
-/** @param value candidate @returns it as a plain object, when it is one */
-function record(value: unknown): Record<string, unknown> | undefined {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : undefined
-}
-
-/**
- * Refuse a payload whose business code is not success.
- *
- * BOSS answers `200 OK` with a non-zero code for "rate limited", "login expired" and friends, so
- * the HTTP status says nothing. Mapping those to fatal codes here is what makes the caller halt the
- * run instead of treating a rejection as an empty resume.
- *
- * @param payload response body
- * @throws PluginError with the mapped fatal code, or `E_BODY_UNAVAILABLE` for an unknown code
- */
-export function assertBossSuccess(payload: unknown): void {
-  const code = record(payload)?.code
-  if (typeof code !== 'number' || code === 0) return
-  const mapped = bossErrorCode(code)
-  if (mapped !== undefined) throw new PluginError(mapped, { code: String(code) })
-  throw new PluginError('E_BODY_UNAVAILABLE', { what: `unexpected business code ${String(code)}` })
-}
 
 /**
  * Read and parse the online resume.
@@ -56,10 +31,7 @@ export async function readResume(browser: BrowserReader): Promise<Resume> {
 
   // An expired session is redirected to the login wall, where the three endpoints never fire.
   // Detecting it here turns a 20-second timeout into an actionable "scan the code" message.
-  if (isLoginUrl(await browser.currentUrl())) {
-    for (const pending of captures) pending.catch(() => undefined)
-    throw new PluginError('E_LOGIN_REQUIRED')
-  }
+  await assertLoggedIn(browser, captures)
 
   const [baseBody, expectBody, statusBody] = await Promise.all(captures)
   for (const body of [baseBody, expectBody, statusBody]) assertBossSuccess(body)

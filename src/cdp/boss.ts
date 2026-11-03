@@ -8,7 +8,9 @@
  * @module dsh-job-ledger/cdp/boss
  */
 
+import { PluginError } from '../shared/errors.ts'
 import type { ErrorCode } from '../shared/errors.ts'
+import { record } from '../shared/json.ts'
 
 /**
  * Marker for the page snapshot these patterns were captured from.
@@ -35,6 +37,10 @@ export const BOSS_API = {
   resumeBaseinfo: /\/wapi\/zpgeek\/resume\/baseinfo\/query\.json(?:\?|$)/,
   resumeExpect: /\/wapi\/zpgeek\/resume\/expect\/query\.json(?:\?|$)/,
   resumeStatus: /\/wapi\/zpgeek\/resume\/status\.json(?:\?|$)/,
+  /** Search results. */
+  searchList: /\/wapi\/zpgeek\/search\/joblist\.json(?:\?|$)/,
+  /** The recommendation rail the search page also loads. */
+  recommendList: /\/wapi\/zpgeek\/pc\/recommend\/job\/list\.json(?:\?|$)/,
 } as const
 
 /**
@@ -54,6 +60,24 @@ export const BOSS_BUSINESS_CODES: Readonly<Record<number, ErrorCode>> = {
 /** @param code business code from a response body @returns the user-facing code, if it is fatal */
 export function bossErrorCode(code: number): ErrorCode | undefined {
   return BOSS_BUSINESS_CODES[code]
+}
+
+/**
+ * Refuse a payload whose business code is not success.
+ *
+ * BOSS answers `200 OK` with a non-zero code for "rate limited", "login expired" and friends, so
+ * the HTTP status says nothing. Mapping those to fatal codes here is what makes callers halt the
+ * run instead of treating a rejection as an empty result.
+ *
+ * @param payload response body
+ * @throws PluginError with the mapped fatal code, or `E_BODY_UNAVAILABLE` for an unknown code
+ */
+export function assertBossSuccess(payload: unknown): void {
+  const code = record(payload)?.code
+  if (typeof code !== 'number' || code === 0) return
+  const mapped = bossErrorCode(code)
+  if (mapped !== undefined) throw new PluginError(mapped, { code: String(code) })
+  throw new PluginError('E_BODY_UNAVAILABLE', { what: `unexpected business code ${String(code)}` })
 }
 
 /**

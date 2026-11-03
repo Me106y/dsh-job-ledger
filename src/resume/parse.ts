@@ -10,6 +10,7 @@
  */
 
 import { PluginError } from '../shared/errors.ts'
+import { dataOf, list, numeric, record, text } from '../shared/json.ts'
 
 /** One job in the resume's work history. */
 export interface ResumeExperience {
@@ -45,46 +46,6 @@ export interface ResumePayloads {
   readonly baseinfo: unknown
   readonly expect: unknown
   readonly status: unknown
-}
-
-/** @param value candidate @returns it as a plain object, when it is one */
-function record(value: unknown): Record<string, unknown> | undefined {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : undefined
-}
-
-/** @param value candidate @returns it as an array, or empty */
-function list(value: unknown): readonly unknown[] {
-  return Array.isArray(value) ? value : []
-}
-
-/** @param value candidate @returns it as a non-empty trimmed string, or undefined */
-function text(value: unknown): string | undefined {
-  if (typeof value !== 'string') return undefined
-  const trimmed = value.trim()
-  return trimmed === '' ? undefined : trimmed
-}
-
-/** @param value candidate @returns it as a finite number, or undefined */
-function numeric(value: unknown): number | undefined {
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
-}
-
-/**
- * Unwrap `zpData` (BOSS wraps everything), tolerating a bare body.
- *
- * @param payload response body
- * @param label which endpoint, for the error message
- * @returns the payload's data object
- * @throws PluginError `E_BODY_UNAVAILABLE` when the body is not an object at all
- */
-function dataOf(payload: unknown, label: string): Record<string, unknown> {
-  const body = record(payload)
-  if (body === undefined) {
-    throw new PluginError('E_BODY_UNAVAILABLE', { what: `${label} is not an object` })
-  }
-  return record(body.zpData) ?? record(body.data) ?? body
 }
 
 /**
