@@ -1,20 +1,22 @@
 /**
  * Plugin entry (host side).
  *
- * P0 (ledger core) is in: event log, projection, three-level dedupe, both state machines, leases and
- * the report. Still skeleton: the Chrome/CDP layer, the tools, the host API and the panel — those
- * land at P1 onward (docs/PRD.md §12). `apply()` stays a stub until the store is wired in P1, so the
- * plugin can be installed without pretending to do more than it does.
+ * In: the ledger core (P0), the browser/CDP read layer and resume tool (P1), discovery + ingestion
+ * (P2). Still missing: the apply path, reconciliation, the host API and the panel — P3 onward
+ * (docs/PRD.md §12).
  *
  * @module dsh-job-ledger
  */
 
 import type { Context } from '@deepseek-ai/cordis'
 
+import { join } from 'node:path'
+
 import { resolveConfig } from './config.ts'
 import type { ConfigInput } from './config.ts'
 import { BrowserRuntime } from './runtime/browser.ts'
-import { registerResumeTool } from './tools/register.ts'
+import { Ledger } from './ledger/store.ts'
+import { registerDiscoverTool, registerResumeTool } from './tools/register.ts'
 
 export { ERROR_MESSAGES, failure, isErrorCode, isFatal, isRetryable, userMessage, PluginError } from './shared/errors.ts'
 export type { ErrorCode, LedgerFailure } from './shared/errors.ts'
@@ -106,6 +108,7 @@ export {
   BOSS_BUSINESS_CODES,
   BOSS_URLS,
   BOSS_VERSION,
+  assertBossSuccess,
   bossErrorCode,
   isLoginUrl,
 } from './cdp/boss.ts'
@@ -131,8 +134,15 @@ export type {
   ResumeExperience,
   ResumePayloads,
 } from './resume/parse.ts'
-export { assertBossSuccess, readResume } from './resume/read.ts'
+export { readResume } from './resume/read.ts'
 export { redactResume } from './resume/redact.ts'
+
+export { DISCOVERY_LIMIT, discoveryUrl, readJobList } from './discover/read.ts'
+export type { DiscoveryResult, DiscoverySource } from './discover/read.ts'
+export { MAX_JD_CHARS, candidateFor, ingestJobs } from './discover/ingest.ts'
+export type { IngestDecision, IngestOptions, IngestResult } from './discover/ingest.ts'
+export { parseJobList, parseSalary } from './discover/parse.ts'
+export type { ParsedJobList, RawJob } from './discover/parse.ts'
 
 export { BrowserRuntime } from './runtime/browser.ts'
 export type { BrowserRuntimeDeps, ReaderProvider } from './runtime/browser.ts'
@@ -144,7 +154,14 @@ export {
   renderResumeResult,
 } from './tools/resume.ts'
 export type { JsonLike, ResumeToolResult } from './tools/resume.ts'
-export { registerResumeTool, resumeTool } from './tools/register.ts'
+export { registerDiscoverTool, registerResumeTool, resumeTool, discoverTool } from './tools/register.ts'
+export {
+  DISCOVER_TOOL_DESCRIPTION,
+  DISCOVER_TOOL_NAME,
+  discoverForModel,
+  renderDiscoverResult,
+} from './tools/discover.ts'
+export type { DiscoverOptions, DiscoverToolResult, DiscoveredJob } from './tools/discover.ts'
 
 /**
  * Cordis plugin name.
@@ -153,7 +170,7 @@ export { registerResumeTool, resumeTool } from './tools/register.ts'
  */
 export const name = 'job-ledger'
 
-/** Services this plugin needs. `tools` is required because the resume tool registers on it. */
+/** Services this plugin needs: `tools` to register, nothing else at P2. */
 export const inject: readonly string[] = ['tools']
 
 /**
@@ -167,7 +184,19 @@ export const inject: readonly string[] = ['tools']
  */
 export function apply(ctx: Context, config: ConfigInput = {}): void {
   const resolved = resolveConfig(config)
+  const ledger = Ledger.open(join(resolved.dataDir, 'events.jsonl'))
   const runtime = new BrowserRuntime(resolved)
+
   registerResumeTool(ctx, runtime, resolved)
-  ctx.logger.info(`dsh-job-ledger: resume tool registered (dataDir: ${resolved.dataDir})`)
+  registerDiscoverTool(ctx, ledger, runtime, resolved)
+
+  // One place to release both handles when the plugin is unloaded.
+  ctx.effect(() => () => {
+    runtime.close()
+    ledger.close()
+  })
+
+  ctx.logger.info(
+    `dsh-job-ledger: tools registered (dataDir: ${resolved.dataDir}, replay: ${String(ledger.report.appliedLines)} lines)`,
+  )
 }

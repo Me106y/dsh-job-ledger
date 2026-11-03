@@ -1,5 +1,5 @@
 /**
- * Registration glue for the resume tool.
+ * Registration glue for the tools.
  *
  * Separated from `tools/resume.ts` so the behaviour can be tested without the harness: importing
  * `@deepseek-ai/dsh-tools` at runtime needs the whole peer tree, which only a DSH install has.
@@ -11,6 +11,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 
 import type { LedgerConfig } from '../config.ts'
+import type { Ledger } from '../ledger/store.ts'
 import type { ReaderProvider } from '../runtime/browser.ts'
 import {
   RESUME_TOOL_DESCRIPTION,
@@ -19,6 +20,13 @@ import {
   renderResumeResult,
 } from './resume.ts'
 import type { ResumeToolResult } from './resume.ts'
+import {
+  DISCOVER_TOOL_DESCRIPTION,
+  DISCOVER_TOOL_NAME,
+  discoverForModel,
+  renderDiscoverResult,
+} from './discover.ts'
+import type { DiscoverToolResult } from './discover.ts'
 
 /**
  * Build the tool definition.
@@ -87,4 +95,101 @@ export function registerResumeTool(
   config: LedgerConfig,
 ): () => void {
   return ctx.tools.register(resumeTool(runtime, config))
+}
+
+/**
+ * Build the discovery tool definition.
+ *
+ * @param ledger the single writer
+ * @param runtime reader provider
+ * @param config resolved configuration
+ * @returns the definition to register
+ */
+export function discoverTool(ledger: Ledger, runtime: ReaderProvider, config: LedgerConfig) {
+  return defineTool({
+    name: DISCOVER_TOOL_NAME,
+    description: DISCOVER_TOOL_DESCRIPTION,
+    parameters: {
+      source: {
+        type: 'string',
+        enum: ['search', 'recommend'],
+        description: '抓推荐流还是搜索结果，默认 search',
+      },
+      limit: {
+        type: 'number',
+        description: '本页最多处理多少条，默认 50（上限也是 50）',
+      },
+    },
+    output: {
+      schema: {
+        oneOf: [
+          {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              ok: { type: 'boolean', const: true, required: true },
+              source: { type: 'string', required: true },
+              added: { type: 'number', required: true },
+              duplicates: { type: 'number', required: true },
+              filtered: { type: 'number', required: true },
+              suspects: { type: 'number', required: true },
+              invalid: { type: 'number', required: true },
+              decisions: {
+                type: 'array',
+                required: true,
+                items: {
+                  type: 'object',
+                  additionalProperties: false,
+                  properties: {
+                    jobId: { type: 'string' },
+                    externalId: { type: 'string', required: true },
+                    kind: { type: 'string', required: true },
+                    reason: { type: 'string', required: true },
+                    duplicateOf: { type: 'string' },
+                  },
+                },
+              },
+            },
+          },
+          {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              ok: { type: 'boolean', const: false, required: true },
+              code: { type: 'string', required: true },
+              message: { type: 'string', required: true },
+            },
+          },
+        ],
+      },
+      render(_args, value) {
+        return [{ type: 'text', text: renderDiscoverResult(value as DiscoverToolResult) }]
+      },
+    },
+    timeoutMs: 120_000,
+    async execute(args) {
+      return discoverForModel(runtime, ledger, config.profile, {
+        source: args.source === 'recommend' ? 'recommend' : 'search',
+        ...(args.limit === undefined ? {} : { limit: args.limit }),
+      })
+    },
+  })
+}
+
+/**
+ * Register the discovery tool on a cordis context.
+ *
+ * @param ctx host context (needs the `tools` service)
+ * @param ledger the single writer
+ * @param runtime reader provider
+ * @param config resolved configuration
+ * @returns the disposer that unregisters the tool
+ */
+export function registerDiscoverTool(
+  ctx: Context,
+  ledger: Ledger,
+  runtime: ReaderProvider,
+  config: LedgerConfig,
+): () => void {
+  return ctx.tools.register(discoverTool(ledger, runtime, config))
 }
