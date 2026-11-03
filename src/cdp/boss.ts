@@ -41,6 +41,30 @@ export const BOSS_API = {
   searchList: /\/wapi\/zpgeek\/search\/joblist\.json(?:\?|$)/,
   /** The recommendation rail the search page also loads. */
   recommendList: /\/wapi\/zpgeek\/pc\/recommend\/job\/list\.json(?:\?|$)/,
+  /**
+   * The request the page fires when an application is sent.
+   *
+   * ⚠️ Unverified: TECH §20 item 1 says to confirm whether this is `friend/add` and whether the
+   * resume is a second request. When it does not match, the attempt degrades to `uncertain`.
+   */
+  sendResume: /\/wapi\/zpgeek\/(?:geek\/)?friend\/add\.json(?:\?|$)/,
+} as const
+
+/**
+ * Selectors used while applying to one job.
+ *
+ * ⚠️ Every one of these is a guess until a live page is inspected (TECH §20 items 1-3, 7). They are
+ * collected here, versioned by {@link BOSS_VERSION}, so a redesign changes one file.
+ */
+export const BOSS_SELECTORS = {
+  /** 立即沟通 on the job detail page. */
+  contactButton: '.btn-startchat, .op-btn-chat, a.btn-startchat',
+  greetingInput: '.chat-input textarea, textarea.input-area, #chat-input',
+  sendButton: '.chat-op .btn-send, .btn-send',
+  /** Optional second step: some page versions send the resume from a toolbar button. */
+  sendResumeButton: '.toolbar .btn-send-resume, .send-resume',
+  chatPanel: '.chat-container, .chat-content, .dialog-container',
+  resumeCard: '.message-card .card-resume, .resume-card, [class*="resume-card"]',
 } as const
 
 /**

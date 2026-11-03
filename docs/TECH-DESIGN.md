@@ -291,6 +291,9 @@ export const BOSS = {
 
 **坐标失效**：点击前 `getBoundingClientRect` 可能被布局变化作废。对策：先滚动到元素可见，取坐标，**立即**在同一帧发点击；失败（元素消失/被遮挡）→ 重试一次，再失败 → `E_SELECTOR_MISSING`。
 
+**实现**：`src/cdp/browser.ts` 的 `CdpReader.click / typeText / waitFor / text`。点击按上面四步发真实输入事件，
+点完后复查元素仍在，否则重试一次；输入用 `Input.insertText`（先 `focus()`）。
+
 ### 5.6 成功判定（B 级判据）
 
 **首选**：监听页面自己发出的"发送简历"请求的响应（`sendResume`，⚠️ 待实测），`code === 0` 即成功。
@@ -306,7 +309,10 @@ export const BOSS = {
 
 **为什么以网络为准**：DOM 会因改版失效，而"简历确实发出去了"的权威证据是平台自己的响应。DOM 只是辅助确认。反过来如果只有 DOM 没有网络证据，也要判 `uncertain`——宁可不确定，不可假成功。
 
-**实现**：`src/run/attempt.ts` 的 `judgeAttempt(signals)` 是纯函数，输入是"点了没有 / 网络信号 / DOM 是否见到卡片"，
+**实现**：`src/cdp/applier.ts` 在**点击之前**挂上 `sendResume` 的 capture——请求是点击自己触发的，
+晚挂一步就永远等不到。读不出 body 的响应记为 `none`，绝不当作成功。
+
+**实现（判定）**：`src/run/attempt.ts` 的 `judgeAttempt(signals)` 是纯函数，输入是"点了没有 / 网络信号 / DOM 是否见到卡片"，
 输出的判定表与上面四条分支一一对应；`haltReasonForFailure(code)` 只把 `isFatal` 的码映射成 `HaltReason`，
 执行层不需要记住哪几个码是整轮级的。
 

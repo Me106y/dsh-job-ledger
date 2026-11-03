@@ -29,6 +29,8 @@ import {
 import type { DiscoverToolResult } from './discover.ts'
 import { QUEUE_TOOL_DESCRIPTION, QUEUE_TOOL_NAME, queueForModel, renderQueueResult } from './queue.ts'
 import type { QueueToolResult } from './queue.ts'
+import { APPLY_TOOL_DESCRIPTION, APPLY_TOOL_NAME, applyForModel, renderApplyResult } from './apply.ts'
+import type { ApplyToolResult, RunStarter } from './apply.ts'
 
 /**
  * Build the tool definition.
@@ -283,4 +285,82 @@ export function queueTool(ledger: Ledger) {
  */
 export function registerQueueTool(ctx: Context, ledger: Ledger): () => void {
   return ctx.tools.register(queueTool(ledger))
+}
+
+/**
+ * Build the apply tool definition.
+ *
+ * The model-facing surface is deliberately small: ids in, counts out. Everything else — claiming,
+ * clicking, evidence, halting — happens inside the one run entry.
+ *
+ * @param starter the single run entry
+ * @returns the definition to register
+ */
+export function applyTool(starter: RunStarter) {
+  return defineTool({
+    name: APPLY_TOOL_NAME,
+    description: APPLY_TOOL_DESCRIPTION,
+    parameters: {
+      ids: {
+        type: 'array',
+        items: { type: 'string' },
+        required: true,
+        description: '要投递的岗位 id，1–10 个；必须已存在于待投清单里',
+      },
+    },
+    output: {
+      schema: {
+        oneOf: [
+          {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              ok: { type: 'boolean', const: true, required: true },
+              runId: { type: 'string', required: true },
+              outcome: { type: 'string', required: true },
+              summary: {
+                type: 'object',
+                additionalProperties: false,
+                required: true,
+                properties: {
+                  submitted: { type: 'number', required: true },
+                  uncertain: { type: 'number', required: true },
+                  failed: { type: 'number', required: true },
+                  skipped: { type: 'number', required: true },
+                },
+              },
+              haltReason: { type: 'string' },
+            },
+          },
+          {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              ok: { type: 'boolean', const: false, required: true },
+              code: { type: 'string', required: true },
+              message: { type: 'string', required: true },
+            },
+          },
+        ],
+      },
+      render(_args, value) {
+        return [{ type: 'text', text: renderApplyResult(value as ApplyToolResult) }]
+      },
+    },
+    timeoutMs: 600_000,
+    async execute(args) {
+      return applyForModel(starter, args.ids)
+    },
+  })
+}
+
+/**
+ * Register the apply tool on a cordis context.
+ *
+ * @param ctx host context (needs the `tools` service)
+ * @param starter the single run entry
+ * @returns the disposer that unregisters the tool
+ */
+export function registerApplyTool(ctx: Context, starter: RunStarter): () => void {
+  return ctx.tools.register(applyTool(starter))
 }
