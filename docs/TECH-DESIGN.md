@@ -662,11 +662,17 @@ listen(/geekDeliverList/) → 拿到第一页
 
 ⚠️ 分页参数待实测（可能是 `page`/`cursor`）。若只能拿到第一页，明确告知"仅校验最近 N 条"，不假装全量。
 
+**实现**：`src/reconcile/read.ts` 目前**只读第一页**，并固定返回 `partial: true`——工具的输出里会写明
+"只核对了平台最近一页，差异可能包含更早的投递"。接口 pattern 按 `geek/deliver/list.json` 实现，同样待实测。
+
 ### 10.2 匹配
 
 1. **主键**：`encryptJobId` ↔ 账本 `externalId`；
 2. **兜底**：`companyNorm + titleNorm + cityNorm` 指纹；
 3. 都匹配不上 → 视为"平台有、账本无"，走补记。
+
+**实现**：`src/reconcile/boss.ts` 的 `reconcile()`。先按 `platform:externalId`，再按指纹；两条都不中才补记。
+补记的 app 用 `source: 'reconcile'`、`resumeId: 'unknown'`（平台没说是哪份简历），时间取平台字段。
 
 ### 10.3 冲突（与 PRD §5.7 一致）
 
@@ -683,6 +689,10 @@ if (ledgerSaysRejected && platformHas) /* 不动 */
 - `source: 'reconcile-backfill'`，`resumeId: 'unknown'`；
 - 只进判重索引，不进报表（`report()` 过滤 `source !== 'reconcile-backfill'`）；
 - 不写 `evidence`（没有截图，也不该伪造）。
+
+**差异列表不落库**：锁定的 schema 只有 `reconcile/summary`（计数），所以"账本有、平台无"的行由
+`reconcile()` **返回**给调用方（工具/面板）显示，不新增事件类型。重启后列表清空，重新对账即可——
+为一张诊断清单改动事件 schema 不划算。
 
 ---
 
@@ -989,7 +999,7 @@ interface BrowserPort {
 | 2 | "发送简历"是独立请求还是随打招呼一起 | 同上，观察是否有第二个写请求 | 决定成功判据（B 级是否可行） |
 | 3 | 简历卡片在聊天流的 DOM 结构 | 投一次后检查 Elements | 决定兜底判定 |
 | 4 | 搜索接口的分页参数与 `city` 编码 | 翻两页看请求差异 | 决定 P2 的翻页实现 |
-| 5 | `geekDeliverList` 的分页与返回字段 | 抓第一页与第二页 | 决定对账能否全量 |
+| 5 | `geekDeliverList` 的分页与返回字段 | 抓第一页与第二页 | 决定对账能否全量；P4 已按"只读第一页 + 明确告知"实现 |
 | 6 | 各接口返回的 `code` 语义是否与 spec 一致 | 故意触发一次 37 | 决定熔断映射 |
 | 7 | 招呼语输入框是否可编辑 | 手动试 | 决定填槽是否落地为"输入"还是"仅选预设" |
 | 8 | 简历三接口（`baseinfo` / `expect` / `status`）的响应字段名 | 登录后打开简历页，导出三个响应体 | 决定 `src/resume/parse.ts` 的映射；P1 先用合成 fixture 实现，并对字段名做别名兜底 |
