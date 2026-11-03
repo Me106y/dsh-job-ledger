@@ -26,6 +26,15 @@ tail -20 ~/.dsh/logs/*.log      # 若插件加载失败，错误在这里
 dsh plugin --profile web remove dsh-job-ledger
 ```
 
+## 0.5 登录（第一次或 cookie 过期时）
+
+> 登录一下 BOSS
+
+预期：Chrome 前台打开登录页，扫码后返回「登录成功（登录态已保存，下次不用再扫）」。
+**要记录**：是否真的等到了；超时的话把提示贴回来。
+
+登录态在 `~/.dsh/job-ledger/chrome-profile`，删掉它等于退出登录。
+
 ## 1. 读简历（P1）
 
 对话里说：

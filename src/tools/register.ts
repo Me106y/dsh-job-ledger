@@ -35,6 +35,8 @@ import { REPORT_TOOL_DESCRIPTION, REPORT_TOOL_NAME, renderReportResult, reportFo
 import type { ReportToolResult } from './report.ts'
 import { PROFILE_TOOL_DESCRIPTION, PROFILE_TOOL_NAME, profileView } from './profile.ts'
 import { RECORD_TOOL_DESCRIPTION, RECORD_TOOL_NAME, recordForModel, renderRecordResult } from './record.ts'
+import { LOGIN_TOOL_DESCRIPTION, LOGIN_TOOL_NAME, loginForModel, renderLoginResult } from './login.ts'
+import type { LoginToolResult } from './login.ts'
 import type { RecordToolResult } from './record.ts'
 import { BACKFILL_TOOL_DESCRIPTION, BACKFILL_TOOL_NAME, backfillForModel, renderBackfillResult } from './backfill.ts'
 import type { BackfillToolResult } from './backfill.ts'
@@ -700,4 +702,66 @@ export function recordTool(ledger: Ledger) {
  */
 export function registerRecordTool(ctx: Context, ledger: Ledger): () => void {
   return ctx.tools.register(recordTool(ledger))
+}
+
+/**
+ * Build the login tool definition.
+ *
+ * @param runtime reader provider
+ * @returns the definition to register
+ */
+export function loginTool(runtime: ReaderProvider) {
+  return defineTool({
+    name: LOGIN_TOOL_NAME,
+    description: LOGIN_TOOL_DESCRIPTION,
+    parameters: {
+      timeoutSeconds: {
+        type: 'number',
+        description: '最多等多少秒（默认 180，范围 30–300）',
+      },
+    },
+    output: {
+      schema: {
+        oneOf: [
+          {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              ok: { type: 'boolean', const: true, required: true },
+              alreadyLoggedIn: { type: 'boolean', required: true },
+              url: { type: 'string', required: true },
+            },
+          },
+          {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              ok: { type: 'boolean', const: false, required: true },
+              code: { type: 'string', required: true },
+              message: { type: 'string', required: true },
+            },
+          },
+        ],
+      },
+      render(_args, value) {
+        return [{ type: 'text', text: renderLoginResult(value as LoginToolResult) }]
+      },
+    },
+    // The wait happens inside the tool, so its budget must exceed the default wait.
+    timeoutMs: 320_000,
+    async execute(args) {
+      const seconds = Math.min(300, Math.max(30, args.timeoutSeconds ?? 180))
+      return loginForModel(runtime, { timeoutMs: seconds * 1_000 })
+    },
+  })
+}
+
+/**
+ * Register the login tool.
+ *
+ * @param ctx host context @param runtime reader provider
+ * @returns the disposer
+ */
+export function registerLoginTool(ctx: Context, runtime: ReaderProvider): () => void {
+  return ctx.tools.register(loginTool(runtime))
 }

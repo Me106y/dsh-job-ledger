@@ -12,7 +12,7 @@
 
 /** Every failure the plugin can report, with the message a person sees. */
 export const ERROR_MESSAGES = {
-  E_LOGIN_REQUIRED: '需要登录 BOSS：请在弹出的浏览器里扫码',
+  E_LOGIN_REQUIRED: '需要登录 BOSS：请在弹出的浏览器里扫码，或用 job_ledger_login 等待登录完成',
   E_CAPTCHA: '遇到验证码，本轮已停止。请先在浏览器里人工处理',
   E_RATE_LIMITED: '触发平台频率限制，本轮已停止。建议 24 小时后再试',
   E_ACCOUNT_RISK: '账号存在异常风险，已停止全部自动化。请先到官网确认账号状态',

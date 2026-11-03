@@ -25,6 +25,8 @@ export const BOSS_URLS = {
   resume: 'https://www.zhipin.com/web/geek/resume',
   chat: 'https://www.zhipin.com/web/geek/chat',
   search: 'https://www.zhipin.com/web/geek/job',
+  /** Where a logged-out session lands; opening it directly shows the QR code. */
+  login: 'https://www.zhipin.com/web/user/',
 } as const
 
 /**
