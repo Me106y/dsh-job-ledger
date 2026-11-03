@@ -34,6 +34,7 @@ export const ERROR_MESSAGES = {
   E_LEDGER_VERSION: '账本由更新版本的插件写入，请先升级插件',
   E_LEDGER_STATE: '账本状态异常：{what}',
   E_INVALID_ARGUMENT: '参数不合法：{what}',
+  E_PRIVACY_BLOCKED: '隐私设置为 redacted，改成 full 后才能读取简历原文',
   E_NOT_CONFIGURED: '插件还没有完成首次配置',
 } as const
 
