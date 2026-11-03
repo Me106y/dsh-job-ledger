@@ -324,5 +324,53 @@
       "kind": "suspect",
       "reason": "same-title-different-jd"
     }
+  },
+  {
+    "name": "bracket-only difference collapses to one role (documented collision)",
+    "now": "2026-11-03T00:00:00.000Z",
+    "existing": [
+      {
+        "id": "j_1",
+        "company": "字节跳动",
+        "title": "后端工程师（Java）",
+        "city": "深圳",
+        "jd": "负责品牌营销活动策划与执行，维护社交媒体渠道，撰写宣传文案，要求具备审美与数据分析能力",
+        "firstSeenAt": "2026-10-24T00:00:00.000Z"
+      }
+    ],
+    "candidate": {
+      "company": "字节跳动",
+      "title": "后端工程师（Go）",
+      "city": "深圳",
+      "jd": "负责后端服务的设计与开发，熟悉 Go 与高并发系统，参与核心交易链路的性能优化，要求五年以上经验"
+    },
+    "expect": {
+      "kind": "duplicate",
+      "reason": "same-role-company"
+    }
+  },
+  {
+    "name": "seniority-only difference collapses to one role (documented collision)",
+    "now": "2026-11-03T00:00:00.000Z",
+    "existing": [
+      {
+        "id": "j_1",
+        "company": "字节跳动",
+        "title": "高级后端工程师",
+        "city": "深圳",
+        "jd": "负责品牌营销活动策划与执行，维护社交媒体渠道，撰写宣传文案，要求具备审美与数据分析能力",
+        "firstSeenAt": "2026-10-24T00:00:00.000Z"
+      }
+    ],
+    "candidate": {
+      "company": "字节跳动",
+      "title": "初级后端工程师",
+      "city": "深圳",
+      "jd": "负责后端服务的设计与开发，熟悉 Go 与高并发系统，参与核心交易链路的性能优化，要求五年以上经验"
+    },
+    "expect": {
+      "kind": "duplicate",
+      "reason": "same-role-company"
+    }
   }
 ]
