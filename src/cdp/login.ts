@@ -67,11 +67,16 @@ export const LOGIN_WAIT_MS = 180_000
 /** How often the URL is checked while waiting. */
 export const LOGIN_WAIT_POLL_MS = 1_000
 
-/** Knobs for {@link waitForLogin}; tests shrink them. */
+/** Knobs for {@link waitForLogin} / {@link waitForLoginPage}; tests shrink them. */
 export interface LoginWaitOptions {
   readonly timeoutMs?: number | undefined
   readonly pollMs?: number | undefined
   readonly sleep?: ((ms: number) => Promise<void>) | undefined
+  /**
+   * Set when the caller has already observed the login page (for example via
+   * {@link waitForLoginPage}). Without it, success requires this call to see the login URL itself.
+   */
+  readonly assumeLoginSeen?: boolean | undefined
 }
 
 /**
@@ -95,9 +100,41 @@ export async function waitForLogin(
   const sleep =
     options.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)))
 
+  // Success means "was on the login page, then left it". Checking only "is not the login page" is
+  // not enough: right after a navigation the browser can still report the previous URL, and that
+  // would report a successful login nobody performed (observed in the real-browser smoke).
+  let sawLogin = options.assumeLoginSeen === true
   const deadline = Date.now() + timeoutMs
   for (;;) {
-    if (!isLoginUrl(await browser.currentUrl())) return true
+    if (isLoginUrl(await browser.currentUrl())) sawLogin = true
+    else if (sawLogin) return true
+
+    if (Date.now() >= deadline) return false
+    await sleep(pollMs)
+  }
+}
+
+/**
+ * Wait until the browser reports the login page.
+ *
+ * Called right after navigating there, this absorbs the moment where `currentUrl` still answers with
+ * the previous page. It is distinct from {@link waitForLogin}: this asks "did we arrive?", that asks
+ * "did we leave?".
+ *
+ * @param browser reader @param options polling knobs @returns true when the login URL was observed
+ */
+export async function waitForLoginPage(
+  browser: BrowserReader,
+  options: LoginWaitOptions = {},
+): Promise<boolean> {
+  const timeoutMs = options.timeoutMs ?? 5_000
+  const pollMs = options.pollMs ?? 250
+  const sleep =
+    options.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)))
+
+  const deadline = Date.now() + timeoutMs
+  for (;;) {
+    if (isLoginUrl(await browser.currentUrl())) return true
     if (Date.now() >= deadline) return false
     await sleep(pollMs)
   }

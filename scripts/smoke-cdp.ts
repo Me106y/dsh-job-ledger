@@ -19,6 +19,7 @@ import type { AddressInfo } from 'node:net'
 
 import { CdpReader } from '../src/cdp/browser.ts'
 import { BOSS_URLS, isLoginUrl } from '../src/cdp/boss.ts'
+import { waitForLogin } from '../src/cdp/login.ts'
 import { ensureChrome, findPageTarget } from '../src/cdp/chrome.ts'
 import { PluginError } from '../src/shared/errors.ts'
 
@@ -116,6 +117,25 @@ async function main(): Promise<void> {
           response.end(JSON.stringify({ ok: true, trusted: true }))
           return
         }
+        if (request.url === '/web/geek/job') {
+          response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+          response.end('<!doctype html><html><body><p id="result">logged in</p></body></html>')
+          return
+        }
+        if (request.url === '/web/user/') {
+          // Behaves like a completed scan: the login URL leaves on its own after a moment.
+          response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+          // A meta refresh was firing immediately in this Chrome; a timer is unambiguous.
+          response.end(
+            '<!doctype html><script>setTimeout(() => { location.href = "/web/geek/job" }, 1500)</script>'
+          )
+          return
+        }
+        if (request.url === '/web/user/stay') {
+          response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+          response.end('<!doctype html><title>login</title><p>nobody scans</p>')
+          return
+        }
         response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
         response.end(`<!doctype html><html><body>
           <button id="go">go</button>
@@ -154,6 +174,24 @@ async function main(): Promise<void> {
       const echoed = await reader.text('#echo')
       if (echoed !== 'hello') fail('type', `page echoes "${echoed}"`)
       ok('type', 'input event carries the inserted text')
+
+      console.log('12. login wait succeeds when the login URL is left')
+      await reader.navigate(`${origin}/web/user/`)
+      // Wait until the browser actually reports the page we navigated to.
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        if (isLoginUrl(await reader.currentUrl())) break
+        await new Promise<void>((resolve) => setTimeout(resolve, 100))
+      }
+      const started = Date.now()
+      const loggedIn = await waitForLogin(reader, { timeoutMs: 10_000, pollMs: 250 })
+      if (!loggedIn) fail('login wait', 'never saw the login URL go away')
+      ok('login wait', `saw it leave after ${String(Date.now() - started)}ms`)
+
+      console.log('13. login wait gives up when nobody scans')
+      await reader.navigate(`${origin}/web/user/stay`)
+      const gaveUp = await waitForLogin(reader, { timeoutMs: 1_200, pollMs: 200 })
+      if (gaveUp) fail('login wait timeout', 'reported success on a page that never moved')
+      ok('login wait timeout', 'returned false instead of pretending')
 
       await new Promise<void>((resolve) => page.close(() => resolve()))
     } finally {

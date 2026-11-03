@@ -52,12 +52,26 @@ test('the QR tab is opened, because the page defaults to SMS', async () => {
 })
 
 test('a page without the QR tab still lets the person log in', async () => {
-  const { provider, browser } = providerWith([LOGIN, JOB])
+  const { provider, browser } = providerWith([LOGIN, LOGIN, JOB])
   browser.clickError = new PluginError('E_SELECTOR_MISSING', { what: BOSS_SELECTORS.loginQrSwitch })
 
   const result = await loginForModel(provider, FAST)
 
   assert.equal(result.ok, true)
+})
+
+test('a scan that finishes before the first look is confirmed on a protected page', async () => {
+  // The browser still reports the page from before the login navigation.
+  const { provider, browser } = providerWith([LOGIN, JOB, JOB, JOB, JOB])
+
+  const result = await loginForModel(provider, FAST)
+
+  assert.equal(result.ok, true)
+  if (!result.ok) return
+  assert.equal(result.alreadyLoggedIn, false)
+  assert.equal(result.url, JOB)
+  // It checked a page that requires a session instead of trusting the stale reading.
+  assert.equal(browser.navigated, BOSS_URLS.resume)
 })
 
 test('a person who never scans gets a coded timeout, not a fake success', async () => {

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { assertLoggedIn } from '../../src/cdp/login.ts'
+import { assertLoggedIn, waitForLogin } from '../../src/cdp/login.ts'
 import { isLoginUrl } from '../../src/cdp/boss.ts'
 import { PluginError } from '../../src/shared/errors.ts'
 import { ReplayBrowser } from '../fixtures/transports.ts'
@@ -41,6 +41,24 @@ test('a redirect that lands after navigation is still caught', async () => {
 test('a logged-in session resolves after the grace period without throwing', async () => {
   const browser = readerAt(['https://www.zhipin.com/web/geek/job'])
   await assert.doesNotReject(assertLoggedIn(browser, [], { intervalMs: 0 }))
+})
+
+test('waiting for a login needs to have seen the login page first', async () => {
+  // Right after a navigation the browser can still report the previous URL; that is not a login.
+  const stale = readerAt(['https://www.zhipin.com/web/geek/job'])
+  assert.equal(await waitForLogin(stale, { timeoutMs: 0 }), false)
+})
+
+test('waiting for a login succeeds once the page leaves the login URL', async () => {
+  const browser = readerAt([
+    'https://www.zhipin.com/web/user/',
+    'https://www.zhipin.com/web/user/',
+    'https://www.zhipin.com/web/geek/job',
+  ])
+  assert.equal(
+    await waitForLogin(browser, { timeoutMs: 5_000, pollMs: 0, sleep: async () => undefined }),
+    true,
+  )
 })
 
 test('the real logout redirect is recognised as a login URL', () => {
