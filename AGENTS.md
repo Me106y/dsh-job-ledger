@@ -13,24 +13,21 @@
 - **技术栈**：TypeScript（ESM / strict）· Node 22 或 24 的内置能力（`child_process` 起 Chrome、原生 `fetch`、原生 `WebSocket` 说 CDP）· `node:test` · tsdown · pnpm。
 - **数据**：`$DSH_HOME/job-ledger/` 下的 `events.jsonl`（只追加），不出本机。
 
-**当前状态：设计完成，实现未开始。** 下一站是里程碑 P0（账本内核）。
-`docs/TECH-DESIGN.md §3.2` 是**目标**目录结构，多数模块还不存在——不要当成已有代码。
+**当前状态：按里程碑推进中，进度以 `docs/PRD.md` §12 与 PR 列表为准。**
+`docs/TECH-DESIGN.md §3.2` 是**目标**目录结构：动手前先 `ls src/`，不要假设某个模块已经存在。
 
 ## 仓库里真实存在什么
 
-| 路径 | 现在是什么 |
-|---|---|
-| `src/index.ts` | 插件入口骨架，`apply()` 只打一行日志 |
-| `src/shared/errors.ts` | 唯一有实质实现的模块：错误码表 + `isFatal` / `isRetryable` + 模板填充 |
-| `test/errors.test.ts` | 唯一测试文件 |
-| `docs/PRD.md` | 产品真理源（§1–§15） |
-| `docs/TECH-DESIGN.md` | 实现真理源（§3.2 目标结构，§20 未验证项） |
-| `lib/` | tsdown 构建产物，gitignored：不手改、不 commit |
-| `cordis.patch.yml` | bundle patch，把插件挂进 profile |
-| `docs/SMOKE-TEST.md` | CI / PR 管线的冒烟标记，不是文档依据 |
+不要凭记忆，用两条命令确认：
 
-- `package.json` 的 `exports["./client"]` 已指向 `lib/client.js`，但 client 入口还没构建（P5）。加 client 时必须同时补 tsdown 第二个 entry。
-- 新模块按 `docs/TECH-DESIGN.md §3.2` 放，但**先确认文件真的存在**再 import。
+```sh
+ls src                     # 有哪几层
+ls src/ledger src/tools    # 关键模块是否存在
+```
+
+- `lib/` 是 tsdown 构建产物，gitignored：**不手改、不 commit**。
+- `package.json` 的 `exports["./client"]` 指向 `lib/client.js`，client 入口在 P5 才构建；加 client 时同步补 tsdown 第二个 entry。
+- 新模块按 `docs/TECH-DESIGN.md §3.2` 的路径放。
 
 ## 快速命令
 
@@ -40,7 +37,8 @@
 | 类型检查 | `pnpm typecheck` |
 | 跑测试 | `pnpm test` |
 | 构建 | `pnpm build` |
-| 全量门禁 | `pnpm check`（typecheck + test + build） |
+| 硬规则扫描 | `pnpm lint:rules`（重放请求 / 合成点击 / 第二写者 / 原生依赖） |
+| 全量门禁 | `pnpm check`（lint:rules + typecheck + test + build） |
 
 - 测试直接用 `node --test test/*.test.ts` 跑 TypeScript：**不引入测试框架**，也不需要先 build。
 - 本地不需要环境变量。配置项走 `cordis.patch.yml`（`TECH-DESIGN.md §14`），不要另起一套 env 体系。
@@ -133,7 +131,7 @@ PRD §3.2 已把多平台、简历改写、自由生成招呼语、上传 PDF、
 
 改代码不算完成，验证过才算：
 
-1. `pnpm check` 全绿。
+1. `pnpm check` 全绿（含硬规则扫描；它报错说明你踩了 AGENTS.md 里的红线，先改代码，不要改规则）。
 2. 逻辑有测试，且是**能失败的测试**：
    - 判重 → `test/dedupe/corpus/*.json` golden corpus（同名不同城市、同公司不同职位、同 JD 跨来源、多 HR 重复发、括号噪声、全角半角）
    - 状态机 → 全转移矩阵，含非法转移

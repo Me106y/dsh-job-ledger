@@ -40,7 +40,8 @@
     "build": "tsdown",
     "typecheck": "tsc --noEmit",
     "test": "node --test \"test/**/*.test.ts\"",
-    "check": "pnpm typecheck && pnpm test && pnpm build"
+    "lint:rules": "node scripts/check-rules.ts",
+    "check": "pnpm lint:rules && pnpm typecheck && pnpm test && pnpm build"
   },
   "dsh": {
     "bundle": {
