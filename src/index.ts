@@ -247,8 +247,6 @@ export function apply(ctx: Context, config: ConfigInput = {}): void {
 
   const runner = new JobRunner({
     ledger,
-    // CdpReader implements BrowserPort; the runtime's type is the narrower reader because tests
-    // substitute a reader-only double.
     applier: createApplier(async () => runtime.reader()),
     dataDir: resolved.dataDir,
     greeting,

@@ -120,3 +120,19 @@ test('the built-in templates all stay within the cap when filled', () => {
     assert.ok([...result.text].length <= MAX_GREETING_CHARS, template.id)
   }
 })
+
+test('a template carrying contact details falls back to the default preset', () => {
+  const job = makeJob({ title: '后端工程师', company: '字节跳动', city: '深圳' })
+
+  const result = fillGreeting({ job, template: '加我微信 abc123，帮你内推' })
+
+  assert.equal(result.templateId, 'direct')
+  assert.doesNotMatch(result.text, /微信|abc123/)
+})
+
+test('a link in a template is refused the same way', () => {
+  const job = makeJob({ title: '后端工程师', company: '字节跳动', city: '深圳' })
+  const result = fillGreeting({ job, template: '简历见 https://example.com/cv' })
+  assert.equal(result.templateId, 'direct')
+  assert.doesNotMatch(result.text, /https?:/)
+})

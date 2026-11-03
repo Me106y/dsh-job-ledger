@@ -121,19 +121,34 @@ function sharedSkills(job: Job, resume: Resume): string[] {
 }
 
 /**
+ * @returns the default template, or throws when the preset table is empty
+ */
+function defaultTemplate(): GreetingTemplate {
+  const fallback = DEFAULT_GREETING_TEMPLATES[0]
+  if (fallback === undefined) throw new Error('no default greeting template')
+  return fallback
+}
+
+/**
  * Resolve the template from the request.
+ *
+ * Template *text* is not provenance-checked (only slot values are), so a template carrying contact
+ * details or a link would slip past the slot guard. Decision 25 says greetings are presets plus
+ * slots, not free prose: a template that trips the forbidden pattern falls back to the default
+ * rather than being sent.
  *
  * @param template object, id or raw text @returns the template and its id
  */
 function resolveTemplate(template: GreetingTemplate | string | undefined): GreetingTemplate {
-  if (template === undefined) {
-    const fallback = DEFAULT_GREETING_TEMPLATES[0]
-    if (fallback === undefined) throw new Error('no default greeting template')
-    return fallback
-  }
-  if (typeof template === 'object') return template
-  const byId = DEFAULT_GREETING_TEMPLATES.find((candidate) => candidate.id === template)
-  return byId ?? { id: 'custom', text: template }
+  if (template === undefined) return defaultTemplate()
+  const resolved: GreetingTemplate =
+    typeof template === 'object'
+      ? template
+      : (DEFAULT_GREETING_TEMPLATES.find((candidate) => candidate.id === template) ?? {
+          id: 'custom',
+          text: template,
+        })
+  return FORBIDDEN.test(resolved.text) ? defaultTemplate() : resolved
 }
 
 /**
