@@ -1,0 +1,6 @@
+# dsh-job-ledger bundle patch: mounts the ledger plugin into a dsh profile composition.
+# Installed via `dsh plugin --profile <name> add dsh-job-ledger` (the bundle manifest
+# makes it a profile layer), or by adding this insert to the profile's cordis.patch.yml.
+- insert:
+    - id: job-ledger
+      name: 'dsh-job-ledger'

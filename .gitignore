@@ -1,0 +1,22 @@
+# macOS
+.DS_Store
+
+# dependencies
+node_modules/
+
+# build output (built from source at publish time, shipped inside the npm tarball)
+lib/
+dist/
+
+# logs & local state
+*.log
+npm-debug.log*
+.pnpm-debug.log*
+
+# editors
+.idea/
+.vscode/
+
+# local ledger data — never commit anything from a real job search
+.job-ledger/
+data/

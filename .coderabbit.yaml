@@ -1,0 +1,71 @@
+# CodeRabbit configuration — https://docs.coderabbit.ai/reference/configuration
+#
+# The rules below encode the two things this project cannot get wrong: dedupe must never silently
+# drop a job, and anything that touches the browser must never replay a request.
+language: zh-CN
+early_access: false
+
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  high_level_summary_placeholder: '@coderabbitai summary'
+  poem: false
+  review_status: true
+  collapse_walkthrough: true
+
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    drafts: false
+    base_branches:
+      - main
+
+  path_filters:
+    - '!**/node_modules/**'
+    - '!pnpm-lock.yaml'
+    - '!lib/**'
+    - '!**/*.png'
+
+  path_instructions:
+    - path: 'src/cdp/**'
+      instructions: |
+        这段代码驱动真实浏览器，风险最高。逐条检查：
+        1. 是否出现了"重放请求"——构造 URL、手动拼 header、调用非页面自身发起的接口。这是硬红线（PRD C3），出现即阻断。
+        2. 点击是否用了 element.click() 之类的合成事件。必须走 Input.dispatchMouseEvent，否则 isTrusted=false，风控可识别。
+        3. 每个可能超时的操作是否有明确超时，超时后是否落到 uncertain 而不是"当成成功"。
+        4. 是否有任何地方把"未确认"当成"已投递"。
+
+    - path: 'src/ledger/**'
+      instructions: |
+        账本是唯一真源，写坏了产品就没了。检查：
+        1. 事件是否只追加、从不修改或删除历史。
+        2. 写入是否 fsync 后才算成功；失败是否向上抛而不是吞掉。
+        3. 重放遇到无法解析的行是否"停止"而不是"跳过"（截断的尾巴之后不可信）。
+        4. 是否存在第二个写文件的 fd 或并发写路径。
+
+    - path: 'src/dedupe/**'
+      instructions: |
+        判重的错误代价不对称：漏判可恢复，误杀不可恢复。检查：
+        1. 是否存在可能把不同岗位判成重复的宽松条件（同公司不同职位、跨城市）。
+        2. 疑似重复是否进了"待裁决"而不是自动剔除。
+        3. 判定是否纯确定性函数，不依赖模型输出。
+        4. 每条结论是否带可解释的 reason。
+
+    - path: 'src/run/**'
+      instructions: |
+        投递执行。检查：
+        1. claim 与 click 之间是否存在可以让同一岗位被投两次的路径。
+        2. uncertain 是否可能被自动重试。
+        3. 熔断是否真的停止整轮，而不是跳过当前继续下一个。
+        4. 单轮/每日上限是否可能被配置或参数绕过。
+
+    - path: 'docs/**'
+      instructions: |
+        文档评审只看一致性与诚实：
+        1. 是否与 PRD 已锁定的决策冲突。
+        2. 是否把"未验证"写成了"已实现"（技术设计里未验证项必须带 ⚠️）。
+        3. 用户可见的承诺是否超出当前实现范围。
+
+chat:
+  auto_reply: true
