@@ -353,6 +353,10 @@ Page.captureScreenshot { format:'png', captureBeyondViewport:false }
 证据写不进去视为 fatal（`E_LEDGER_WRITE`）——继续跑就等于记录一批"没有证据的 submitted"，
 正是设计要消灭的状态。
 
+**状态记 `uncertain`，不是 `failed`**（PRD §15 决策 30）：网络已经确认发出，只是证明丢了。
+`failed` 不在阻断状态里，该岗位会重新可投——再投一次就是重复投递；`uncertain` 只能由人核对平台后推进。
+本轮仍以 `ledger-write` 熔断。
+
 ### 5.8 错误与恢复
 
 | 情况 | 处理 |
