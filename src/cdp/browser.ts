@@ -22,6 +22,10 @@ export interface BrowserReader {
   navigate(url: string): Promise<void>
   capture(pattern: RegExp, timeoutMs?: number): Promise<unknown>
   screenshot(): Promise<Buffer>
+  /** Where the page actually ended up; navigating can redirect to the login wall. */
+  currentUrl(): Promise<string>
+  /** Release the connection. The browser process is left running on purpose. */
+  close(): void
 }
 
 /** Default budget for a page to fire `load`. */
@@ -106,6 +110,22 @@ export class CdpReader implements BrowserReader {
       pattern,
       timeoutMs ?? undefined,
     )
+  }
+
+  /**
+   * Read the live location, so a redirect to the login wall is detectable.
+   *
+   * @returns the current page URL
+   */
+  async currentUrl(): Promise<string> {
+    const result = await this.#session.call<{
+      result?: { value?: unknown }
+    }>('Runtime.evaluate', { expression: 'location.href', returnByValue: true })
+    const value = result.result?.value
+    if (typeof value !== 'string') {
+      throw new PluginError('E_BODY_UNAVAILABLE', { what: 'location.href' })
+    }
+    return value
   }
 
   /** @returns a PNG of the current viewport */

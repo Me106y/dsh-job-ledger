@@ -8,7 +8,7 @@
  * @module dsh-job-ledger/resume/read
  */
 
-import { BOSS_API, BOSS_URLS, bossErrorCode } from '../cdp/boss.ts'
+import { BOSS_API, BOSS_URLS, bossErrorCode, isLoginUrl } from '../cdp/boss.ts'
 import type { BrowserReader } from '../cdp/browser.ts'
 import { PluginError } from '../shared/errors.ts'
 import { parseResume } from './parse.ts'
@@ -46,13 +46,22 @@ export function assertBossSuccess(payload: unknown): void {
  * @returns the structured resume (unredacted; callers pass it through `redactResume`)
  */
 export async function readResume(browser: BrowserReader): Promise<Resume> {
-  const baseinfo = browser.capture(BOSS_API.resumeBaseinfo)
-  const expect = browser.capture(BOSS_API.resumeExpect)
-  const status = browser.capture(BOSS_API.resumeStatus)
+  const captures = [
+    browser.capture(BOSS_API.resumeBaseinfo),
+    browser.capture(BOSS_API.resumeExpect),
+    browser.capture(BOSS_API.resumeStatus),
+  ]
 
   await browser.navigate(BOSS_URLS.resume)
 
-  const [baseBody, expectBody, statusBody] = await Promise.all([baseinfo, expect, status])
+  // An expired session is redirected to the login wall, where the three endpoints never fire.
+  // Detecting it here turns a 20-second timeout into an actionable "scan the code" message.
+  if (isLoginUrl(await browser.currentUrl())) {
+    for (const pending of captures) pending.catch(() => undefined)
+    throw new PluginError('E_LOGIN_REQUIRED')
+  }
+
+  const [baseBody, expectBody, statusBody] = await Promise.all(captures)
   for (const body of [baseBody, expectBody, statusBody]) assertBossSuccess(body)
 
   return parseResume({ baseinfo: baseBody, expect: expectBody, status: statusBody })
