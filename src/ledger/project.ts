@@ -239,6 +239,7 @@ export function applyEvent(projection: Projection, event: LedgerEvent): void {
         state: event.state,
         updatedAt: event.at,
         ...(event.evidence === undefined ? {} : { evidence: event.evidence }),
+        ...(event.note === undefined ? {} : { note: event.note }),
       }
       projection.apps.set(next.id, next)
       projection.reached.get(next.id)?.add(next.state)

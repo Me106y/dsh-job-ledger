@@ -85,6 +85,8 @@ export interface Application {
   readonly greetText?: string
   /** Relative evidence path (`evidence/<appId>.png`). Never synthesized (PRD §5.5). */
   readonly evidence?: string
+  /** Reason shown next to the state, e.g. why an attempt is `failed` or `uncertain`. */
+  readonly note?: string
   readonly runId?: string
   readonly createdAt: string
   readonly updatedAt: string
