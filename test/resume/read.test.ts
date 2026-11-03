@@ -71,3 +71,14 @@ test('an unknown business code is a body failure, not a silent success', async (
     return true
   })
 })
+
+test('a redirect to the login wall fails fast instead of waiting for captures', async () => {
+  const browser = new ReplayBrowser(fixture)
+  browser.url = 'https://www.zhipin.com/web/user/?ka=header-login'
+
+  await assert.rejects(readResume(browser), (error: unknown) => {
+    assert.ok(error instanceof PluginError)
+    assert.equal(error.code, 'E_LOGIN_REQUIRED')
+    return true
+  })
+})
