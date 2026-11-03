@@ -68,7 +68,7 @@ test('backfill is excluded from every number but still reported as excluded', ()
   assert.equal(report.excludedBackfill, 1)
   assert.deepEqual(
     report.sources.map((row) => row.source),
-    ['applied'],
+    ['search'],
   )
   assert.match(reportMarkdown(report), /1 条回填数据未计入/)
 })
@@ -91,8 +91,51 @@ test('the conclusion names the best source once there is enough data', () => {
   }
 
   const report = buildReport(projection, NOW)
-  assert.match(report.conclusion, /applied 来源回复率最高/)
+  assert.match(report.conclusion, /search 来源回复率最高/)
   assert.match(report.conclusion, /建议加投/)
+})
+
+test('attempts that never left the machine are excluded and reported separately', () => {
+  const projection = createProjection()
+  const submitted = addJob(projection, { company: 'A', title: '后端', city: '深圳' })
+  const applying = addJob(projection, { company: 'B', title: '后端', city: '深圳' })
+  const failed = addJob(projection, { company: 'C', title: '后端', city: '深圳' })
+  const uncertain = addJob(projection, { company: 'D', title: '后端', city: '深圳' })
+
+  walk(projection, submitted.id, 'applied', ['submitted'])
+  walk(projection, applying.id, 'applied', ['applying'])
+  walk(projection, failed.id, 'applied', ['applying', 'failed'])
+  walk(projection, uncertain.id, 'applied', ['applying', 'uncertain'])
+
+  const report = buildReport(projection, NOW)
+  // A click that did not land is not a 投递; counting it would inflate every rate below.
+  assert.equal(report.funnel.applied, 1)
+  assert.equal(report.funnel.unconfirmed, 3)
+  assert.equal(report.funnel.replyRate, 0)
+})
+
+test('the source column is where the job came from, not how the application was recorded', () => {
+  const projection = createProjection()
+  const searched = addJob(projection, { company: 'A', title: '后端', city: '深圳' })
+  const recommended = addJob(projection, {
+    company: 'B',
+    title: '后端',
+    city: '深圳',
+    source: 'recommend',
+  })
+
+  walk(projection, searched.id, 'applied', ['submitted'])
+  walk(projection, recommended.id, 'applied', ['submitted'])
+
+  const report = buildReport(projection, NOW)
+  assert.deepEqual(report.sources.map((row) => row.source).sort(), ['recommend', 'search'])
+})
+
+test('an empty funnel does not claim a 100% submit rate', () => {
+  const report = buildReport(createProjection(), NOW)
+  const markdown = reportMarkdown(report)
+  assert.match(markdown, /\| 投递 \| 0 \| 0\.0% \|/)
+  assert.doesNotMatch(markdown, /\| 投递 \| 0 \| 100\.0% \|/)
 })
 
 test('the weekly table has eight buckets ending with the current week', () => {

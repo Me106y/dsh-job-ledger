@@ -25,7 +25,7 @@ import type {
 import type { Profile } from '../shared/profile.ts'
 import { DEFAULT_PROFILE, mergeProfile } from '../shared/profile.ts'
 import { PluginError } from '../shared/errors.ts'
-import { canTransition } from './states.ts'
+import { assertTransition } from './states.ts'
 
 /**
  * States after which a job is never applied to again (TECH §9.2).
@@ -210,6 +210,11 @@ export function applyEvent(projection: Projection, event: LedgerEvent): void {
     }
     case 'app/create': {
       const app = event.app
+      // A second create for one id would silently replace the application and desynchronise the
+      // byState index: history would vanish while the indexes still pointed at the old state.
+      if (projection.apps.has(app.id)) {
+        throw new PluginError('E_LEDGER_STATE', { what: `app ${app.id} already exists` })
+      }
       const job = projection.jobs.get(app.jobId)
       if (job === undefined) throw unknownJob(app.jobId)
       projection.apps.set(app.id, app)
@@ -228,13 +233,7 @@ export function applyEvent(projection: Projection, event: LedgerEvent): void {
       if (app === undefined) throw unknownApp(event.appId)
       // Replaying a state that is already current is a no-op, not a violation: reconcile and
       // backfill can legitimately re-assert `submitted` after a partial run.
-      if (app.state !== event.state && !canTransition(app.state, event.state)) {
-        throw new PluginError('E_ILLEGAL_TRANSITION', {
-          from: app.state,
-          to: event.state,
-          allowed: 'see ledger/states.ts',
-        })
-      }
+      if (app.state !== event.state) assertTransition(app.state, event.state)
       const next: Application = {
         ...app,
         state: event.state,
@@ -315,16 +314,18 @@ export function applyEvent(projection: Projection, event: LedgerEvent): void {
   projection.lastAppliedAt = event.at
 }
 
+// Entity-state problems are not disk failures: using E_LEDGER_WRITE here told the user to check
+// free space for a bug that had nothing to do with the disk.
 function unknownJob(id: string): PluginError {
-  return new PluginError('E_LEDGER_WRITE', { what: `job ${id} is not in the ledger` })
+  return new PluginError('E_LEDGER_STATE', { what: `job ${id} is not in the ledger` })
 }
 
 function unknownApp(id: string): PluginError {
-  return new PluginError('E_LEDGER_WRITE', { what: `app ${id} is not in the ledger` })
+  return new PluginError('E_LEDGER_STATE', { what: `app ${id} is not in the ledger` })
 }
 
 function unknownRun(id: string): PluginError {
-  return new PluginError('E_LEDGER_WRITE', { what: `run ${id} is not in the ledger` })
+  return new PluginError('E_LEDGER_STATE', { what: `run ${id} is not in the ledger` })
 }
 
 /* -------------------------------------------------------------------------- */
@@ -359,7 +360,9 @@ export function activeLease(
 ): Lease | undefined {
   const lease = projection.leases.get(jobId)
   if (lease === undefined) return undefined
-  return Date.parse(lease.expiresAt) > now ? lease : undefined
+  // TECH §6.5: `expiresAt < now` is free, so an expiry exactly at `now` still holds the job.
+  // Treating it as free would let a second claim through on the boundary tick.
+  return Date.parse(lease.expiresAt) >= now ? lease : undefined
 }
 
 /** @param projection ledger @param jobId job id @returns the job, or a coded error */

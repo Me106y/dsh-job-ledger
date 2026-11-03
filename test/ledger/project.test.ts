@@ -78,7 +78,42 @@ test('an application referencing a missing job is refused', () => {
     () => applyEvent(projection, envelope({ type: 'app/create', app })),
     (error: unknown) => {
       assert.ok(error instanceof PluginError)
-      assert.equal(error.code, 'E_LEDGER_WRITE')
+      assert.equal(error.code, 'E_LEDGER_STATE')
+      return true
+    },
+  )
+})
+
+test('a duplicated application id is refused instead of overwriting history', () => {
+  const projection = createProjection()
+  const job = addJob(projection, { company: '字节跳动', title: '后端工程师', city: '深圳' })
+  const app = addApp(projection, job, 'submitted')
+
+  assert.throws(
+    () =>
+      applyEvent(
+        projection,
+        envelope({ type: 'app/create', app: { ...makeApp(job.id, 'queued'), id: app.id } }),
+      ),
+    (error: unknown) => {
+      assert.ok(error instanceof PluginError)
+      assert.equal(error.code, 'E_LEDGER_STATE')
+      return true
+    },
+  )
+})
+
+test('an illegal transition carries the list of allowed targets', () => {
+  const projection = createProjection()
+  const job = addJob(projection, { company: '字节跳动', title: '后端工程师', city: '深圳' })
+  const app = addApp(projection, job, 'submitted')
+
+  assert.throws(
+    () => applyEvent(projection, envelope({ type: 'app/state', appId: app.id, state: 'queued' })),
+    (error: unknown) => {
+      assert.ok(error instanceof PluginError)
+      assert.equal(error.code, 'E_ILLEGAL_TRANSITION')
+      assert.equal(error.values?.allowed, 'replied,rejected,withdrawn')
       return true
     },
   )
@@ -170,7 +205,9 @@ test('leases expire by timestamp, not by release', () => {
     }),
   )
   assert.equal(activeLease(projection, job.id, NOW)?.owner, 'run-1')
-  assert.equal(activeLease(projection, job.id, NOW + 120_000), undefined)
+  // The boundary tick still belongs to the holder: only `expiresAt < now` frees the job.
+  assert.equal(activeLease(projection, job.id, NOW + 60_000)?.owner, 'run-1')
+  assert.equal(activeLease(projection, job.id, NOW + 60_001), undefined)
 
   applyEvent(projection, envelope({ type: 'lease/release', jobId: job.id }))
   assert.equal(activeLease(projection, job.id, NOW), undefined)
@@ -237,7 +274,7 @@ test('requireJob refuses an unknown id with a coded error', () => {
     () => requireJob(createProjection(), 'j_nope'),
     (error: unknown) => {
       assert.ok(error instanceof PluginError)
-      assert.equal(error.code, 'E_LEDGER_WRITE')
+      assert.equal(error.code, 'E_LEDGER_STATE')
       return true
     },
   )

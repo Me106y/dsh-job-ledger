@@ -94,6 +94,36 @@ test('a newer schema refuses to load instead of guessing', () => {
   )
 })
 
+test('an event missing a required field is a coded error naming the line', () => {
+  const raw = Buffer.from(`{"v":1,"at":"${AT}","type":"job/add"}\n`)
+  assert.throws(
+    () => replay(raw),
+    (error: unknown) => {
+      assert.ok(error instanceof PluginError)
+      assert.equal(error.code, 'E_LEDGER_STATE')
+      assert.match(error.message, /line 1 is a job\/add event without job/)
+      return true
+    },
+  )
+})
+
+test('a semantic violation during replay keeps its own code', () => {
+  const job = makeJob({ company: '字节跳动', title: '后端工程师', city: '深圳' })
+  const app = makeApp(job.id, 'submitted')
+  const raw = Buffer.from(
+    `${line({ type: 'job/add', job })}${line({ type: 'app/create', app })}${line({ type: 'app/state', appId: app.id, state: 'queued' })}\n`,
+  )
+
+  assert.throws(
+    () => replay(raw),
+    (error: unknown) => {
+      assert.ok(error instanceof PluginError)
+      assert.equal(error.code, 'E_ILLEGAL_TRANSITION')
+      return true
+    },
+  )
+})
+
 test('blank lines are tolerated', () => {
   const job = makeJob({ company: '字节跳动', title: '后端工程师', city: '深圳' })
   const raw = Buffer.from(`\n${line({ type: 'job/add', job })}\n\n`)

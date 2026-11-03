@@ -32,6 +32,7 @@ export const ERROR_MESSAGES = {
   E_CDP_DISCONNECTED: '浏览器连接已断开',
   E_LEDGER_WRITE: '账本写入失败，请检查磁盘空间与权限',
   E_LEDGER_VERSION: '账本由更新版本的插件写入，请先升级插件',
+  E_LEDGER_STATE: '账本状态异常：{what}',
   E_NOT_CONFIGURED: '插件还没有完成首次配置',
 } as const
 

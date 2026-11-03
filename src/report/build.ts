@@ -16,10 +16,10 @@
 
 import type { AppState } from '../ledger/events.ts'
 import type { Projection } from '../ledger/project.ts'
-import { ATTEMPTED_STATES } from '../ledger/project.ts'
 
 /** Funnel counts and stage-to-stage conversion rates (0–1). */
 export interface Funnel {
+  /** Attempts that were confirmed to have gone out. This is the denominator for every rate. */
   readonly applied: number
   readonly replied: number
   readonly interview: number
@@ -27,6 +27,8 @@ export interface Funnel {
   readonly replyRate: number
   readonly interviewRate: number
   readonly offerRate: number
+  /** Attempts that never produced a confirmed submission: applying / uncertain / failed. */
+  readonly unconfirmed: number
 }
 
 /** One row per application source. */
@@ -55,6 +57,24 @@ export interface Report {
 }
 
 const WEEK_MS = 7 * 86_400_000
+
+/**
+ * Stages that prove an application left the machine.
+ *
+ * `applying` is only a click in progress and `failed` is a click that did not land; counting either
+ * as "投递" would inflate every rate downstream (PRD §5.8).
+ */
+const SUBMITTED_OR_LATER: readonly AppState[] = [
+  'submitted',
+  'replied',
+  'interview',
+  'offer',
+  'rejected',
+  'withdrawn',
+]
+
+/** Attempts that are deliberately not part of the denominator. */
+const UNCONFIRMED_STATES: readonly AppState[] = ['applying', 'uncertain', 'failed']
 
 /** @param part smaller count @param whole larger count @returns part/whole, or 0 when whole is 0 */
 function ratio(part: number, whole: number): number {
@@ -88,7 +108,10 @@ export function buildReport(projection: Projection, now: number): Report {
     return set !== undefined && states.some((state) => set.has(state))
   }
 
-  const applied = counted.filter((app) => reachedAny(app.id, ATTEMPTED_STATES))
+  const applied = counted.filter((app) => reachedAny(app.id, SUBMITTED_OR_LATER))
+  const unconfirmed = counted.filter(
+    (app) => !reachedAny(app.id, SUBMITTED_OR_LATER) && reachedAny(app.id, UNCONFIRMED_STATES),
+  )
   const replied = applied.filter((app) => reachedAny(app.id, ['replied', 'interview', 'offer']))
   const interview = applied.filter((app) => reachedAny(app.id, ['interview', 'offer']))
   const offer = applied.filter((app) => reachedAny(app.id, ['offer']))
@@ -101,14 +124,18 @@ export function buildReport(projection: Projection, now: number): Report {
     replyRate: ratio(replied.length, applied.length),
     interviewRate: ratio(interview.length, applied.length),
     offerRate: ratio(offer.length, applied.length),
+    unconfirmed: unconfirmed.length,
   }
 
+  // Source means "where the job came from" (search / recommendation), not how the application
+  // was recorded; PRD §5.8 asks which source converts, and that is a property of the posting.
   const bySource = new Map<string, { applied: number; replied: number }>()
   for (const app of applied) {
-    const row = bySource.get(app.source) ?? { applied: 0, replied: 0 }
+    const source = projection.jobs.get(app.jobId)?.source ?? 'unknown'
+    const row = bySource.get(source) ?? { applied: 0, replied: 0 }
     row.applied += 1
     if (reachedAny(app.id, ['replied', 'interview', 'offer'])) row.replied += 1
-    bySource.set(app.source, row)
+    bySource.set(source, row)
   }
   const sources: SourceRow[] = [...bySource.entries()]
     .map(([source, row]) => ({
@@ -179,11 +206,14 @@ export function reportMarkdown(report: Report): string {
     '',
     '| 阶段 | 数量 | 占投递 |',
     '|---|---:|---:|',
-    `| 投递 | ${String(report.funnel.applied)} | 100.0% |`,
+    `| 投递 | ${String(report.funnel.applied)} | ${report.funnel.applied === 0 ? '0.0%' : '100.0%'} |`,
     `| 回复 | ${String(report.funnel.replied)} | ${percent(report.funnel.replyRate)} |`,
     `| 面试 | ${String(report.funnel.interview)} | ${percent(report.funnel.interviewRate)} |`,
     `| offer | ${String(report.funnel.offer)} | ${percent(report.funnel.offerRate)} |`,
     '',
+    ...(report.funnel.unconfirmed > 0
+      ? [`> 另有 ${String(report.funnel.unconfirmed)} 条尝试未确认（applying / uncertain / failed），不计入投递。`, '']
+      : []),
     '## 来源',
     '',
     '| 来源 | 投递 | 回复 | 回复率 |',

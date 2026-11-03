@@ -62,6 +62,17 @@ test('starting a second run is E_RUN_ACTIVE, not a generic refusal', () => {
   )
 })
 
+test('starting while paused is E_RUN_ACTIVE, because the paused run holds the lock', () => {
+  assert.throws(
+    () => transition('paused', 'start'),
+    (error: unknown) => {
+      assert.ok(error instanceof PluginError)
+      assert.equal(error.code, 'E_RUN_ACTIVE')
+      return true
+    },
+  )
+})
+
 test('halted is terminal: a halted run never resumes itself', () => {
   assert.throws(() => transition('halted', 'resume'), PluginError)
   assert.throws(() => transition('halted', 'start'), PluginError)

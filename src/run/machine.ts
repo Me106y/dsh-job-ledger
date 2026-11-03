@@ -62,8 +62,10 @@ export function isRunFinished(state: RunState): boolean {
  * @throws PluginError `E_RUN_ACTIVE` when a second run tries to start, `E_ILLEGAL_TRANSITION` otherwise
  */
 export function transition(state: RunState, action: RunAction, outcome?: RunOutcome): RunState {
-  if (action === 'start' && state === 'running') {
-    throw new PluginError('E_RUN_ACTIVE', { run: 'running' })
+  // A paused run still owns the single-run lock, so starting "again" is a second run, not a
+  // resume: resume is its own action and needs a fresh authorization.
+  if (action === 'start' && isRunActive(state)) {
+    throw new PluginError('E_RUN_ACTIVE', { run: state })
   }
   const target = RUN_TRANSITIONS[state][action]
   if (target === undefined) {
