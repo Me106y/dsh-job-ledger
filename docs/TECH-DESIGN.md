@@ -844,6 +844,10 @@ Skill 不是文档，是**约束**。每条约束都要有对应的工具侧校�
 
 ## 17. 测试
 
+硬规则不是靠评审记住的：`scripts/check-rules.ts` 会被 `pnpm check` 与 CI 调用，扫描「重放请求、
+合成点击、第二写者、ledger 反向依赖、client 越界 import、原生依赖、console 输出」七条，
+报错时同时给出"哪里错 / 为什么 / 怎么改"。
+
 ### 17.1 单元
 
 - **判重 golden corpus**：`test/dedupe/corpus/*.json`，每条含两个岗位 + 期望结论 + 理由。至少覆盖：同名不同城市、同公司不同职位、同 JD 跨来源、多 HR 重复发、括号噪声、全角/半角。
