@@ -9,7 +9,7 @@
 
 import type { Ledger } from '../ledger/store.ts'
 import { reconcile } from '../reconcile/boss.ts'
-import type { Discrepancy, ReconcileReport } from '../reconcile/boss.ts'
+import type { Discrepancy, PlatformOnlyRow, ReconcileReport } from '../reconcile/boss.ts'
 import { readDelivered } from '../reconcile/read.ts'
 import type { ReaderProvider } from '../runtime/browser.ts'
 import { PluginError, userMessage } from '../shared/errors.ts'
@@ -29,6 +29,7 @@ export type ReconcileToolResult =
       readonly backfilled: number
       readonly partial: boolean
       readonly discrepancies: Discrepancy[]
+      readonly platformOnly: PlatformOnlyRow[]
     }
   | { readonly ok: false; readonly code: string; readonly message: string }
 
@@ -65,6 +66,7 @@ export async function reconcileForModel(
       backfilled: report.backfilled,
       partial: report.partial,
       discrepancies: [...report.discrepancies],
+      platformOnly: [...report.platformOnly],
     }
   } catch (error) {
     if (error instanceof PluginError) {

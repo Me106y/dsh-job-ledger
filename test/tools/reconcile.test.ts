@@ -85,6 +85,7 @@ test('the rendered line warns when only part of the history was read', () => {
       backfilled: 1,
       partial: true,
       discrepancies: [],
+      platformOnly: [],
     }),
     '对账完成：匹配 4 / 补记 1 / 差异 0（只核对了平台最近一页，差异可能包含更早的投递）',
   )

@@ -395,6 +395,19 @@ export function reconcileTool(ledger: Ledger, runtime: ReaderProvider) {
               matched: { type: 'number', required: true },
               backfilled: { type: 'number', required: true },
               partial: { type: 'boolean', required: true },
+              platformOnly: {
+                type: 'array',
+                required: true,
+                items: {
+                  type: 'object',
+                  additionalProperties: false,
+                  properties: {
+                    externalId: { type: 'string', required: true },
+                    company: { type: 'string', required: true },
+                    title: { type: 'string', required: true },
+                  },
+                },
+              },
               discrepancies: {
                 type: 'array',
                 required: true,

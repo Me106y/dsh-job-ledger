@@ -726,6 +726,10 @@ export interface Api {
 }
 ```
 
+**P5 已实现**：`GET queue / overview / reconcile / run`、`POST run/start`、`POST reconcile/run`、
+`POST apps/:id/state`。`run/pause`、`run/resume`、`run/halt` **没有实现**——executor 还不能暂停一轮，
+返回 409 会撒谎，所以先不提供；`reconcile/ack` 不落库，改由客户端本地记忆（差异列表本来就不持久化）。
+
 视图类型（只读投影，均为小对象）：
 
 ```ts
@@ -747,6 +751,9 @@ interface RunView { runId?: string; state: 'idle'|'queued'|'running'|'paused'|'h
 - `POST run/start` 两次 → 第二次 `409 E_RUN_ACTIVE`；
 - `POST apps/:id/state` 带非法转移 → `409 E_ILLEGAL_TRANSITION`（返回 `allowed` 列表）；
 - 所有写命令幂等于"当前状态检查"，不引入 requestId（单用户场景，成本不划算）。
+
+**实现**：`src/api/handlers.ts` 是一个纯分发器：`{ method, path, query, body, headers } → { status, body }`。
+挂载到 `ctx.webServer` 的那一层只有几行，行为（鉴权头、视图形状、错误映射）不依赖 HTTP 框架，可以单测。
 
 ### 11.4 轮询
 
