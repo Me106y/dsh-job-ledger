@@ -51,3 +51,17 @@ test('a rate-limited list surfaces as E_RATE_LIMITED', async () => {
     return true
   })
 })
+
+test('a capture that times out during navigation does not crash the process', async () => {
+  const browser = new ReplayBrowser({ deliver })
+  browser.capture = () =>
+    new Promise((_resolve, reject) => {
+      setTimeout(() => reject(new PluginError('E_NAV_TIMEOUT', { what: 'capture' })), 10)
+    })
+  browser.navigate = () => new Promise<void>((resolve) => setTimeout(resolve, 60))
+  browser.url = 'https://www.zhipin.com/web/user/'
+
+  // The capture rejects before the login check runs; without an attached handler this test process
+  // would die on an unhandled rejection instead of seeing E_LOGIN_REQUIRED.
+  await assert.rejects(readDelivered(browser), /登录/)
+})

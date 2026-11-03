@@ -30,6 +30,9 @@ export interface DeliveredRead {
  */
 export async function readDelivered(browser: BrowserReader): Promise<DeliveredRead> {
   const pending = browser.capture(BOSS_API.deliverList)
+  // Same hazard as navigation: this can reject while the page is still loading, and an unobserved
+  // rejection kills the process instead of surfacing as a coded failure.
+  pending.catch(() => undefined)
 
   // The chat page is where the list request originates (it needs that page as its referer).
   await browser.navigate(BOSS_URLS.chat)

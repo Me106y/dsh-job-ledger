@@ -1020,7 +1020,11 @@ interface BrowserPort {
 验证缺失选择器的错误码，检查登录墙，并在一个本地测试页上验证两件事：**点击是可信事件**
 （`event.isTrusted === true`，即没有用合成 `.click()`）与**数据来自页面自己发出的请求**（arm 后导航，
 捕获到页面自身 `fetch` 的响应）。它还用一个本地页面验证登录等待的两条路径：URL 离开登录页 → 成功；
-一直不离开 → 返回 false（而不是假装登录成功）。2026-11-03 在本机（Chrome 156）跑通，同时暴露并修掉了四个真 bug：
+一直不离开 → 返回 false（而不是假装登录成功）。最后一步把 `lib/client.js` 喂给真实浏览器、
+配一个**替身** `__ModuleLoader__`，确认它确实以 classic script 方式注册了包名——构建期 vm 检查的浏览器版本。
+
+本地检查排在 BOSS 之前：BOSS 是第三方，慢或不可达时它的 20 秒超时会把后面的本地页检查一起拖坏；
+现在 BOSS 失败只记 warning。2026-11-03 在本机（Chrome 156）跑通，同时暴露并修掉了四个真 bug：
 
 1. 连的是 **browser 级** WebSocket，`Page.enable` 在那一层不存在——必须连 page target；
 2. `currentUrl` 用 `Runtime.evaluate` 取，BOSS 的页面会卡住渲染线程（15s 无响应）——改走

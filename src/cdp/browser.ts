@@ -183,6 +183,10 @@ export class CdpReader implements BrowserPort {
       ['Page.loadEventFired', 'Page.frameNavigated'],
       NAVIGATE_TIMEOUT_MS,
     )
+    // The event wait can time out while `Page.navigate` is still pending; an unobserved rejection
+    // would take the whole process down before the await below runs. Mark it handled, and keep
+    // awaiting the same promise: a real timeout still throws there.
+    settled.catch(() => undefined)
     await this.#session.call('Page.navigate', { url }, NAVIGATE_TIMEOUT_MS)
     const event = await settled
 
