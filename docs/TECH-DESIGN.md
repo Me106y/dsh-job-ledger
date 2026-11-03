@@ -364,6 +364,7 @@ Page.captureScreenshot { format:'png', captureBeyondViewport:false }
 | WebSocket 断开 | 本轮 halt，reason `cdp-disconnected`；重连后**不自动续跑** |
 | tab 被用户手动关掉 | 同上，`target-closed` |
 | Chrome 崩溃退出 | 同上，`chrome-exited`；下轮启动时重新拉起 |
+| 进程在投递中退出 | 残留的 `applying` 在插件挂载时被改成 `uncertain`（`src/run/recovery.ts`）：`applying` 不阻断重投，租约过期后同一岗位会再次可投，而点击可能已经发出 |
 | 导航 30s 超时 | 该岗位 `failed`（连续 2 次则 halt） |
 | 页面被风控跳转到验证页 | 立刻 halt，reason `captcha`，并把截图存进证据（用户需要看到拦截页） |
 
