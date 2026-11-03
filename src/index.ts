@@ -15,7 +15,6 @@ import { join } from 'node:path'
 import { resolveConfig } from './config.ts'
 import type { ConfigInput } from './config.ts'
 import { createApplier } from './cdp/applier.ts'
-import type { BrowserPort } from './cdp/browser.ts'
 import type { Job } from './ledger/events.ts'
 import { JobRunner } from './run/executor.ts'
 import { fillGreeting } from './resume/greeting.ts'
@@ -249,7 +248,7 @@ export function apply(ctx: Context, config: ConfigInput = {}): void {
     ledger,
     // CdpReader implements BrowserPort; the runtime's type is the narrower reader because tests
     // substitute a reader-only double.
-    applier: createApplier(async () => (await runtime.reader()) as BrowserPort),
+    applier: createApplier(async () => runtime.reader()),
     dataDir: resolved.dataDir,
     greeting,
   })

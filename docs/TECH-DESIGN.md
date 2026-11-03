@@ -213,7 +213,9 @@ api ───┼─► run ─► cdp(boss) ─► chrome/network
 ```
 
 **登录态（实现）**：profile 固定在 `dataDir/chrome-profile`，cookie 跨进程复用，「扫一次」是真的。
-检测到登录墙时 `job_ledger_login` 打开 `/web/user/` 等待扫码（默认 3 分钟，可传 `timeoutSeconds`），
+检测到登录墙时 `job_ledger_login` 打开 `/web/user/`，**点开「APP扫码登录」tab**（`.btn-sign-switch`，
+2026-11-03 从真实 DOM 读到、点击后截图确认二维码出现；找不到该 tab 就算了，验证码登录照样能用），
+然后等待扫码（默认 3 分钟，可传 `timeoutSeconds`），
 **URL 离开登录页**即视为成功（真机观察：未登录访问任意 geek 页都会重定向到 `/web/user/`）；超时返回
 `E_LOGIN_REQUIRED`，不假装成功。cookie 过期就再扫一次——插件不会替用户登录。
 

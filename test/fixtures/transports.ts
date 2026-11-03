@@ -112,6 +112,35 @@ export class ReplayBrowser implements BrowserReader {
     return this.url
   }
 
+  readonly clicked: string[] = []
+  readonly typed: { selector: string; text: string }[] = []
+  /** Text returned for each selector; unknown selectors read as empty. */
+  texts = new Map<string, string>()
+  /** When set, `click` rejects with this error (used to test best-effort clicks). */
+  clickError: unknown
+
+  /** @param selector element to click @param timeoutMs ignored */
+  async click(selector: string, timeoutMs = 0): Promise<void> {
+    void timeoutMs
+    if (this.clickError !== undefined) throw this.clickError
+    this.clicked.push(selector)
+  }
+
+  /** @param selector input element @param text what to insert */
+  async typeText(selector: string, text: string): Promise<void> {
+    this.typed.push({ selector, text })
+  }
+
+  /** @param selector element @returns whether it is considered present */
+  async waitFor(selector: string): Promise<boolean> {
+    return this.texts.has(selector) || selector === 'body'
+  }
+
+  /** @param selector element @returns its configured text */
+  async text(selector: string): Promise<string> {
+    return this.texts.get(selector) ?? ''
+  }
+
   /** Mark the reader closed. */
   close(): void {
     this.closed = true
