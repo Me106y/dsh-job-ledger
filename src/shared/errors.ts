@@ -31,6 +31,7 @@ export const ERROR_MESSAGES = {
   E_CHROME_NOT_STARTED: 'Chrome 启动失败',
   E_CDP_DISCONNECTED: '浏览器连接已断开',
   E_LEDGER_WRITE: '账本写入失败，请检查磁盘空间与权限',
+  E_LEDGER_VERSION: '账本由更新版本的插件写入，请先升级插件',
   E_NOT_CONFIGURED: '插件还没有完成首次配置',
 } as const
 
@@ -109,4 +110,32 @@ export function userMessage(code: ErrorCode, values?: Readonly<Record<string, st
  */
 export function failure(code: ErrorCode, values?: Readonly<Record<string, string>>): LedgerFailure {
   return values === undefined ? { code } : { code, values }
+}
+
+/**
+ * A coded failure thrown by a layer that has no return channel (state machine, ledger writer).
+ *
+ * Tools never throw this: they catch it and return `failure()`. The class exists so a thrown error
+ * still carries a code the host can branch on, instead of an anonymous `Error` whose message has to
+ * be pattern-matched at the call site.
+ */
+export class PluginError extends Error {
+  readonly code: ErrorCode
+  readonly values?: Readonly<Record<string, string>>
+
+  /**
+   * @param code failure code
+   * @param values placeholder values for the user-facing message
+   */
+  constructor(code: ErrorCode, values?: Readonly<Record<string, string>>) {
+    super(userMessage(code, values))
+    this.name = 'PluginError'
+    this.code = code
+    if (values !== undefined) this.values = values
+  }
+
+  /** @returns the structured failure shape tools and the host API return */
+  toFailure(): LedgerFailure {
+    return failure(this.code, this.values)
+  }
 }

@@ -1,0 +1,328 @@
+[
+  {
+    "name": "a clean candidate is new",
+    "now": "2026-11-03T00:00:00.000Z",
+    "existing": [],
+    "candidate": {
+      "company": "网易",
+      "title": "后端工程师",
+      "city": "杭州",
+      "jd": "负责后端服务的设计与开发，熟悉 Go 与高并发系统，参与核心交易链路的性能优化，要求五年以上经验"
+    },
+    "expect": {
+      "kind": "new",
+      "reason": "new"
+    }
+  },
+  {
+    "name": "same company and title in another city is new",
+    "now": "2026-11-03T00:00:00.000Z",
+    "existing": [
+      {
+        "id": "j_1",
+        "company": "字节跳动",
+        "title": "后端工程师",
+        "city": "北京",
+        "jd": "负责后端服务的设计与开发，熟悉 Go 与高并发系统，参与核心交易链路的性能优化，要求五年以上经验",
+        "firstSeenAt": "2026-10-24T00:00:00.000Z"
+      }
+    ],
+    "candidate": {
+      "company": "字节跳动",
+      "title": "后端工程师",
+      "city": "深圳",
+      "jd": "负责后端服务的设计与开发，熟悉 Go 与高并发系统，参与核心交易链路的性能优化，要求五年以上经验"
+    },
+    "expect": {
+      "kind": "new",
+      "reason": "new"
+    }
+  },
+  {
+    "name": "same company role city inside 45 days is a duplicate",
+    "now": "2026-11-03T00:00:00.000Z",
+    "existing": [
+      {
+        "id": "j_1",
+        "company": "字节跳动",
+        "title": "后端工程师",
+        "city": "深圳",
+        "jd": "负责品牌营销活动策划与执行，维护社交媒体渠道，撰写宣传文案，要求具备审美与数据分析能力",
+        "firstSeenAt": "2026-10-24T00:00:00.000Z"
+      }
+    ],
+    "candidate": {
+      "company": "字节跳动",
+      "title": "后端工程师",
+      "city": "深圳",
+      "jd": "负责后端服务的设计与开发，熟悉 Go 与高并发系统，参与核心交易链路的性能优化，要求五年以上经验"
+    },
+    "expect": {
+      "kind": "duplicate",
+      "reason": "same-role-company"
+    }
+  },
+  {
+    "name": "the same posting re-listed by a second HR is a duplicate",
+    "now": "2026-11-03T00:00:00.000Z",
+    "existing": [
+      {
+        "id": "j_1",
+        "company": "字节跳动",
+        "title": "后端工程师",
+        "city": "深圳",
+        "jd": "负责后端服务的设计与开发，熟悉 Go 与高并发系统，参与核心交易链路的性能优化，要求五年以上经验",
+        "externalId": "hr_one",
+        "firstSeenAt": "2026-10-31T00:00:00.000Z"
+      }
+    ],
+    "candidate": {
+      "company": "北京市字节跳动科技有限公司",
+      "title": "高级后端工程师",
+      "city": "深圳市",
+      "jd": "负责后端服务的设计与开发，熟悉 Go 与高并发系统，参与核心交易链路的性能优化，要求五年以上经验",
+      "externalId": "hr_two"
+    },
+    "expect": {
+      "kind": "duplicate",
+      "reason": "same-role-company"
+    }
+  },
+  {
+    "name": "identical JD at another company in the same city is a duplicate",
+    "now": "2026-11-03T00:00:00.000Z",
+    "existing": [
+      {
+        "id": "j_1",
+        "company": "某科技甲",
+        "title": "后端工程师",
+        "city": "深圳",
+        "jd": "负责后端服务的设计与开发，熟悉 Go 与高并发系统，参与核心交易链路的性能优化，要求五年以上经验",
+        "firstSeenAt": "2026-10-29T00:00:00.000Z"
+      }
+    ],
+    "candidate": {
+      "company": "某科技乙",
+      "title": "后端工程师",
+      "city": "深圳",
+      "jd": "负责后端服务的设计与开发，熟悉 Go 与高并发系统，参与核心交易链路的性能优化，要求五年以上经验"
+    },
+    "expect": {
+      "kind": "duplicate",
+      "reason": "cross-source-same-jd"
+    }
+  },
+  {
+    "name": "the same company with a different title is always a new job",
+    "now": "2026-11-03T00:00:00.000Z",
+    "existing": [
+      {
+        "id": "j_1",
+        "company": "字节跳动",
+        "title": "后端工程师",
+        "city": "深圳",
+        "jd": "负责后端服务的设计与开发，熟悉 Go 与高并发系统，参与核心交易链路的性能优化，要求五年以上经验",
+        "firstSeenAt": "2026-10-24T00:00:00.000Z"
+      }
+    ],
+    "candidate": {
+      "company": "字节跳动",
+      "title": "服务端工程师",
+      "city": "深圳",
+      "jd": "负责后端服务的设计与开发，熟悉 Go 与高并发系统，参与核心交易链路的性能优化，要求五年以上经验"
+    },
+    "expect": {
+      "kind": "new",
+      "reason": "new"
+    }
+  },
+  {
+    "name": "a similar JD in another city is not a duplicate",
+    "now": "2026-11-03T00:00:00.000Z",
+    "existing": [
+      {
+        "id": "j_1",
+        "company": "某科技甲",
+        "title": "后端工程师",
+        "city": "北京",
+        "jd": "负责后端服务的设计与开发，熟悉 Go 与高并发系统，参与核心交易链路的性能优化，要求五年以上经验",
+        "firstSeenAt": "2026-10-29T00:00:00.000Z"
+      }
+    ],
+    "candidate": {
+      "company": "某科技乙",
+      "title": "后端工程师",
+      "city": "深圳",
+      "jd": "负责后端服务的设计与开发，熟悉 Go 与高并发系统，参与核心交易链路的性能优化，要求五年以上经验"
+    },
+    "expect": {
+      "kind": "new",
+      "reason": "new"
+    }
+  },
+  {
+    "name": "a submitted application starts a 90-day cooldown, even in another city",
+    "now": "2026-11-03T00:00:00.000Z",
+    "existing": [
+      {
+        "id": "j_1",
+        "company": "美团",
+        "title": "前端工程师",
+        "city": "北京",
+        "firstSeenAt": "2026-10-14T00:00:00.000Z",
+        "apps": [
+          {
+            "id": "a_1",
+            "state": "submitted",
+            "at": "2026-10-24T00:00:00.000Z"
+          }
+        ]
+      }
+    ],
+    "candidate": {
+      "company": "美团",
+      "title": "前端工程师",
+      "city": "深圳"
+    },
+    "expect": {
+      "kind": "duplicate",
+      "reason": "cooldown"
+    }
+  },
+  {
+    "name": "an uncertain application also starts the cooldown",
+    "now": "2026-11-03T00:00:00.000Z",
+    "existing": [
+      {
+        "id": "j_1",
+        "company": "腾讯",
+        "title": "产品经理",
+        "city": "深圳",
+        "firstSeenAt": "2026-10-14T00:00:00.000Z",
+        "apps": [
+          {
+            "id": "a_1",
+            "state": "uncertain",
+            "at": "2026-10-29T00:00:00.000Z"
+          }
+        ]
+      }
+    ],
+    "candidate": {
+      "company": "腾讯",
+      "title": "产品经理",
+      "city": "北京"
+    },
+    "expect": {
+      "kind": "duplicate",
+      "reason": "cooldown"
+    }
+  },
+  {
+    "name": "bracketed urgency markers do not fork identity",
+    "now": "2026-11-03T00:00:00.000Z",
+    "existing": [
+      {
+        "id": "j_1",
+        "company": "阿里巴巴",
+        "title": "高级后端工程师（急招）",
+        "city": "深圳",
+        "jd": "负责品牌营销活动策划与执行，维护社交媒体渠道，撰写宣传文案，要求具备审美与数据分析能力",
+        "firstSeenAt": "2026-10-24T00:00:00.000Z"
+      }
+    ],
+    "candidate": {
+      "company": "阿里巴巴",
+      "title": "后端工程师",
+      "city": "深圳市",
+      "jd": "负责后端服务的设计与开发，熟悉 Go 与高并发系统，参与核心交易链路的性能优化，要求五年以上经验"
+    },
+    "expect": {
+      "kind": "duplicate",
+      "reason": "same-role-company"
+    }
+  },
+  {
+    "name": "full-width and half-width company names collapse",
+    "now": "2026-11-03T00:00:00.000Z",
+    "existing": [
+      {
+        "id": "j_1",
+        "company": "ＡＣＭＥ　Ｃｏｒｐ",
+        "title": "Backend Engineer",
+        "city": "深圳",
+        "jd": "负责品牌营销活动策划与执行，维护社交媒体渠道，撰写宣传文案，要求具备审美与数据分析能力",
+        "firstSeenAt": "2026-10-24T00:00:00.000Z"
+      }
+    ],
+    "candidate": {
+      "company": "Acme Corp",
+      "title": "Backend Engineer",
+      "city": "深圳",
+      "jd": "负责后端服务的设计与开发，熟悉 Go 与高并发系统，参与核心交易链路的性能优化，要求五年以上经验"
+    },
+    "expect": {
+      "kind": "duplicate",
+      "reason": "same-role-company"
+    }
+  },
+  {
+    "name": "an excluded keyword filters the candidate, it does not dedupe it",
+    "now": "2026-11-03T00:00:00.000Z",
+    "existing": [],
+    "candidate": {
+      "company": "某公司",
+      "title": "销售代表",
+      "city": "深圳"
+    },
+    "expect": {
+      "kind": "filtered",
+      "reason": "excluded-keyword"
+    }
+  },
+  {
+    "name": "a blacklisted company is filtered with the normalized name",
+    "now": "2026-11-03T00:00:00.000Z",
+    "profile": {
+      "target": {
+        "companyBlacklist": [
+          "某外包"
+        ]
+      }
+    },
+    "existing": [],
+    "candidate": {
+      "company": "某外包有限公司",
+      "title": "后端工程师",
+      "city": "深圳"
+    },
+    "expect": {
+      "kind": "filtered",
+      "reason": "company-blacklist"
+    }
+  },
+  {
+    "name": "a posting seen outside the 45-day window becomes suspect, not a drop",
+    "now": "2026-11-03T00:00:00.000Z",
+    "existing": [
+      {
+        "id": "j_1",
+        "company": "字节跳动",
+        "title": "后端工程师",
+        "city": "深圳",
+        "jd": "负责品牌营销活动策划与执行，维护社交媒体渠道，撰写宣传文案，要求具备审美与数据分析能力",
+        "firstSeenAt": "2026-09-04T00:00:00.000Z"
+      }
+    ],
+    "candidate": {
+      "company": "字节跳动",
+      "title": "后端工程师",
+      "city": "深圳",
+      "jd": "负责后端服务的设计与开发，熟悉 Go 与高并发系统，参与核心交易链路的性能优化，要求五年以上经验"
+    },
+    "expect": {
+      "kind": "suspect",
+      "reason": "same-title-different-jd"
+    }
+  }
+]
