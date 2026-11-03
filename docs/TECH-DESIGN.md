@@ -506,6 +506,8 @@ function decide(cand, state, now) {
 - 疑似区**不进自动剔除**，必须用户裁决；
 - 被过滤的岗位保留 `reason`，可一键捞回；
 - 每条决策写 `job/decision` 事件，带 `reason` 与 `duplicateOf`，事后可审计"为什么没投它"。
+- **无裁决不入队列**：队列只列有 `job/decision` 的岗位。回填与对账产生的岗位没有裁决事件，
+  若按"默认 new"展示，等于引诱用户去投一个已经投过的岗位。
 - **重复不落库**：判为 duplicate 的岗位只计数并记入 `ingest/summary`，不追加 `job/add`。
   否则每次扫描都会让事件日志线性膨胀，而日志本身就是产品价值；`duplicateOf` 指向已经持有
   该身份的岗位，理由仍然可追。

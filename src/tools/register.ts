@@ -27,6 +27,8 @@ import {
   renderDiscoverResult,
 } from './discover.ts'
 import type { DiscoverToolResult } from './discover.ts'
+import { QUEUE_TOOL_DESCRIPTION, QUEUE_TOOL_NAME, queueForModel, renderQueueResult } from './queue.ts'
+import type { QueueToolResult } from './queue.ts'
 
 /**
  * Build the tool definition.
@@ -192,4 +194,93 @@ export function registerDiscoverTool(
   config: LedgerConfig,
 ): () => void {
   return ctx.tools.register(discoverTool(ledger, runtime, config))
+}
+
+/**
+ * Build the queue tool definition. Read-only: it takes the ledger and never the browser.
+ *
+ * @param ledger the open ledger
+ * @returns the definition to register
+ */
+export function queueTool(ledger: Ledger) {
+  return defineTool({
+    name: QUEUE_TOOL_NAME,
+    description: QUEUE_TOOL_DESCRIPTION,
+    parameters: {
+      filter: {
+        type: 'string',
+        enum: ['new', 'suspect', 'filtered'],
+        description: 'new=新岗位，suspect=疑似重复待裁决，filtered=被筛掉可捞回，默认 new',
+      },
+      limit: {
+        type: 'number',
+        description: '最多返回多少行，默认 50（上限也是 50）',
+      },
+    },
+    output: {
+      schema: {
+        oneOf: [
+          {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              ok: { type: 'boolean', const: true, required: true },
+              filter: { type: 'string', required: true },
+              total: { type: 'number', required: true },
+              rows: {
+                type: 'array',
+                required: true,
+                items: {
+                  type: 'object',
+                  additionalProperties: false,
+                  properties: {
+                    jobId: { type: 'string', required: true },
+                    title: { type: 'string', required: true },
+                    company: { type: 'string', required: true },
+                    city: { type: 'string', required: true },
+                    decision: { type: 'string', required: true },
+                    reason: { type: 'string', required: true },
+                    salaryRaw: { type: 'string' },
+                    salaryMin: { type: 'number' },
+                    duplicateOf: { type: 'string' },
+                    source: { type: 'string', required: true },
+                    firstSeenAt: { type: 'string', required: true },
+                  },
+                },
+              },
+            },
+          },
+          {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              ok: { type: 'boolean', const: false, required: true },
+              code: { type: 'string', required: true },
+              message: { type: 'string', required: true },
+            },
+          },
+        ],
+      },
+      render(_args, value) {
+        return [{ type: 'text', text: renderQueueResult(value as QueueToolResult) }]
+      },
+    },
+    async execute(args) {
+      return queueForModel(ledger, {
+        ...(args.filter === undefined ? {} : { filter: args.filter }),
+        ...(args.limit === undefined ? {} : { limit: args.limit }),
+      })
+    },
+  })
+}
+
+/**
+ * Register the queue tool on a cordis context.
+ *
+ * @param ctx host context (needs the `tools` service)
+ * @param ledger the open ledger
+ * @returns the disposer that unregisters the tool
+ */
+export function registerQueueTool(ctx: Context, ledger: Ledger): () => void {
+  return ctx.tools.register(queueTool(ledger))
 }

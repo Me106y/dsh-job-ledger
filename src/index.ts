@@ -16,7 +16,7 @@ import { resolveConfig } from './config.ts'
 import type { ConfigInput } from './config.ts'
 import { BrowserRuntime } from './runtime/browser.ts'
 import { Ledger } from './ledger/store.ts'
-import { registerDiscoverTool, registerResumeTool } from './tools/register.ts'
+import { registerDiscoverTool, registerQueueTool, registerResumeTool } from './tools/register.ts'
 
 export { ERROR_MESSAGES, failure, isErrorCode, isFatal, isRetryable, userMessage, PluginError } from './shared/errors.ts'
 export type { ErrorCode, LedgerFailure } from './shared/errors.ts'
@@ -154,7 +154,17 @@ export {
   renderResumeResult,
 } from './tools/resume.ts'
 export type { JsonLike, ResumeToolResult } from './tools/resume.ts'
-export { registerDiscoverTool, registerResumeTool, resumeTool, discoverTool } from './tools/register.ts'
+export {
+  discoverTool,
+  queueTool,
+  registerDiscoverTool,
+  registerQueueTool,
+  registerResumeTool,
+  resumeTool,
+} from './tools/register.ts'
+export { QUEUE_TOOL_NAME, queueForModel, renderQueueResult } from './tools/queue.ts'
+export { QUEUE_LIMIT, queueRows, queueTotal } from './ledger/queue.ts'
+export type { QueueFilter, QueueRow } from './ledger/queue.ts'
 export {
   DISCOVER_TOOL_DESCRIPTION,
   DISCOVER_TOOL_NAME,
@@ -189,6 +199,7 @@ export function apply(ctx: Context, config: ConfigInput = {}): void {
 
   registerResumeTool(ctx, runtime, resolved)
   registerDiscoverTool(ctx, ledger, runtime, resolved)
+  registerQueueTool(ctx, ledger)
 
   // One place to release both handles when the plugin is unloaded.
   ctx.effect(() => () => {
