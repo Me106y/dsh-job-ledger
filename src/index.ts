@@ -23,7 +23,13 @@ import { readResume } from './resume/read.ts'
 import type { Resume } from './resume/parse.ts'
 import { BrowserRuntime } from './runtime/browser.ts'
 import { Ledger } from './ledger/store.ts'
-import { registerApplyTool, registerDiscoverTool, registerQueueTool, registerResumeTool } from './tools/register.ts'
+import {
+  registerApplyTool,
+  registerDiscoverTool,
+  registerQueueTool,
+  registerReconcileTool,
+  registerResumeTool,
+} from './tools/register.ts'
 
 export { ERROR_MESSAGES, failure, isErrorCode, isFatal, isRetryable, userMessage, PluginError } from './shared/errors.ts'
 export type { ErrorCode, LedgerFailure } from './shared/errors.ts'
@@ -241,6 +247,7 @@ export function apply(ctx: Context, config: ConfigInput = {}): void {
   registerDiscoverTool(ctx, ledger, runtime, resolved)
   registerQueueTool(ctx, ledger)
   registerApplyTool(ctx, runner)
+  registerReconcileTool(ctx, ledger, runtime)
 
   // One place to release both handles when the plugin is unloaded.
   ctx.effect(() => () => {

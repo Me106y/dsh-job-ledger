@@ -31,6 +31,13 @@ import { QUEUE_TOOL_DESCRIPTION, QUEUE_TOOL_NAME, queueForModel, renderQueueResu
 import type { QueueToolResult } from './queue.ts'
 import { APPLY_TOOL_DESCRIPTION, APPLY_TOOL_NAME, applyForModel, renderApplyResult } from './apply.ts'
 import type { ApplyToolResult, RunStarter } from './apply.ts'
+import {
+  RECONCILE_TOOL_DESCRIPTION,
+  RECONCILE_TOOL_NAME,
+  reconcileForModel,
+  renderReconcileResult,
+} from './reconcile.ts'
+import type { ReconcileToolResult } from './reconcile.ts'
 
 /**
  * Build the tool definition.
@@ -363,4 +370,82 @@ export function applyTool(starter: RunStarter) {
  */
 export function registerApplyTool(ctx: Context, starter: RunStarter): () => void {
   return ctx.tools.register(applyTool(starter))
+}
+
+/**
+ * Build the reconcile tool definition.
+ *
+ * @param ledger the single writer
+ * @param runtime reader provider
+ * @returns the definition to register
+ */
+export function reconcileTool(ledger: Ledger, runtime: ReaderProvider) {
+  return defineTool({
+    name: RECONCILE_TOOL_NAME,
+    description: RECONCILE_TOOL_DESCRIPTION,
+    parameters: {},
+    output: {
+      schema: {
+        oneOf: [
+          {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              ok: { type: 'boolean', const: true, required: true },
+              matched: { type: 'number', required: true },
+              backfilled: { type: 'number', required: true },
+              partial: { type: 'boolean', required: true },
+              discrepancies: {
+                type: 'array',
+                required: true,
+                items: {
+                  type: 'object',
+                  additionalProperties: false,
+                  properties: {
+                    jobId: { type: 'string', required: true },
+                    company: { type: 'string', required: true },
+                    title: { type: 'string', required: true },
+                    city: { type: 'string', required: true },
+                    state: { type: 'string', required: true },
+                  },
+                },
+              },
+            },
+          },
+          {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              ok: { type: 'boolean', const: false, required: true },
+              code: { type: 'string', required: true },
+              message: { type: 'string', required: true },
+            },
+          },
+        ],
+      },
+      render(_args, value) {
+        return [{ type: 'text', text: renderReconcileResult(value as ReconcileToolResult) }]
+      },
+    },
+    timeoutMs: 60_000,
+    async execute() {
+      return reconcileForModel(runtime, ledger)
+    },
+  })
+}
+
+/**
+ * Register the reconcile tool on a cordis context.
+ *
+ * @param ctx host context (needs the `tools` service)
+ * @param ledger the single writer
+ * @param runtime reader provider
+ * @returns the disposer that unregisters the tool
+ */
+export function registerReconcileTool(
+  ctx: Context,
+  ledger: Ledger,
+  runtime: ReaderProvider,
+): () => void {
+  return ctx.tools.register(reconcileTool(ledger, runtime))
 }
