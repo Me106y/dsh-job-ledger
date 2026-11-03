@@ -75,6 +75,10 @@ $DSH_HOME/job-ledger/          # 可配置 dataDir
 7. 招呼语输入框是否可编辑；
 8. 面板的 slot / locale 注册形状（客户端包由宿主运行时提供，仓库里没有其类型）。
 
+**已验证（2026-11-03，Chrome 156，未登录）**：`pnpm smoke:cdp` 跑通了 Chrome 启动 → CDP 连接 → 导航 →
+DOM 读取 → 截图 → 缺失选择器错误码 → 登录墙识别。未登录时 BOSS 会重定向到 `/web/user/`（不是设计里猜的
+`?login`），重定向晚于框架提交，所以登录检查是轮询而不是单次。
+
 改版只需要改 `src/cdp/boss.ts` 一个文件——所有选择器与接口 pattern 都集中在那里。
 
 ## 开发
@@ -84,6 +88,7 @@ pnpm install
 pnpm check          # 硬规则扫描 + 类型检查（host/client）+ 测试 + 构建
 pnpm test           # node --test，不需要测试框架
 pnpm lint:rules     # 七条硬规则：重放请求 / 合成点击 / 第二写者 / 原生依赖 …
+pnpm smoke:cdp      # 真实 Chrome：启动、CDP、导航、DOM、截图、登录墙（不需要账号）
 ```
 
 - Node `^22.19 || >=24`；测试直接跑 TypeScript。

@@ -141,6 +141,45 @@ export async function probeDebugPort(port: number): Promise<DebugTarget | undefi
 }
 
 /**
+ * Ask a running Chrome for its page targets.
+ *
+ * The browser-level WebSocket from `/json/version` only accepts browser commands: `Page.enable`
+ * answers "'Page.enable' wasn't found" there. Page commands (navigate, DOM, screenshots) live on a
+ * page target, so the reader must connect to one of these.
+ *
+ * @param port debug port
+ * @param fetchImpl injectable fetch, for tests
+ * @returns the first page target, or undefined
+ */
+export async function findPageTarget(
+  port: number,
+  fetchImpl: typeof fetch = fetch,
+): Promise<DebugTarget | undefined> {
+  try {
+    const response = await fetchImpl(`http://127.0.0.1:${String(port)}/json/list`, {
+      signal: AbortSignal.timeout(2000),
+    })
+    if (!response.ok) return undefined
+    const body = (await response.json()) as unknown
+    if (!Array.isArray(body)) return undefined
+
+    for (const entry of body) {
+      if (typeof entry !== 'object' || entry === null) continue
+      const target = entry as { type?: unknown; url?: unknown; webSocketDebuggerUrl?: unknown }
+      if (target.type !== 'page') continue
+      if (typeof target.webSocketDebuggerUrl !== 'string') continue
+      return {
+        webSocketDebuggerUrl: target.webSocketDebuggerUrl,
+        browser: typeof target.url === 'string' ? target.url : 'about:blank',
+      }
+    }
+    return undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
  * Get a Chrome that speaks CDP on the requested port, launching one if necessary.
  *
  * Reuse comes first: a browser already listening is the one the user logged into, and starting a

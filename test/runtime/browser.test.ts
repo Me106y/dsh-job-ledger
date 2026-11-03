@@ -26,11 +26,14 @@ function chromeDeps(): ChromeDeps {
   }
 }
 
-test('the first call launches a browser and connects exactly once', async () => {
+const PAGE = { webSocketDebuggerUrl: 'ws://127.0.0.1:9444/devtools/page/p' }
+
+test('the first call launches a browser and connects to a page target', async () => {
   const opened: string[] = []
   const browser = new ReplayBrowser({ baseinfo: {}, expect: {}, status: {} })
   const runtime = new BrowserRuntime(CONFIG, {
     chrome: chromeDeps(),
+    pageTarget: async () => PAGE,
     openReader: async (url) => {
       opened.push(url)
       return browser
@@ -40,7 +43,7 @@ test('the first call launches a browser and connects exactly once', async () => 
   const reader = await runtime.reader()
 
   assert.equal(reader, browser)
-  assert.deepEqual(opened, ['ws://127.0.0.1:9444/devtools/browser/t'])
+  assert.deepEqual(opened, [PAGE.webSocketDebuggerUrl])
   assert.equal(runtime.launched, true)
 })
 
@@ -49,6 +52,7 @@ test('the reader is reused, so a second tool call does not relaunch Chrome', asy
   const browser = new ReplayBrowser({ baseinfo: {}, expect: {}, status: {} })
   const runtime = new BrowserRuntime(CONFIG, {
     chrome: chromeDeps(),
+    pageTarget: async () => PAGE,
     openReader: async () => {
       opens += 1
       return browser
@@ -66,6 +70,7 @@ test('two calls arriving together share one launch', async () => {
   let resolveOpen: ((reader: BrowserReader) => void) | undefined
   const runtime = new BrowserRuntime(CONFIG, {
     chrome: chromeDeps(),
+    pageTarget: async () => PAGE,
     openReader: () =>
       new Promise<BrowserReader>((resolve) => {
         opens += 1
@@ -88,6 +93,7 @@ test('closing releases the reader and the next call reconnects', async () => {
   const readers: ReplayBrowser[] = []
   const runtime = new BrowserRuntime(CONFIG, {
     chrome: chromeDeps(),
+    pageTarget: async () => PAGE,
     openReader: async () => {
       opens += 1
       const reader = new ReplayBrowser({ baseinfo: {}, expect: {}, status: {} })

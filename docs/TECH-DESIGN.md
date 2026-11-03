@@ -988,6 +988,17 @@ interface BrowserPort {
 4. 拔网线 → halt → 重启 → 状态一致；
 5. 对账 → 差异 0。
 
+**不需要账号的那一半已经自动化**：`pnpm smoke:cdp` 启动真实 Chrome、连 CDP、打开 BOSS、读 DOM、截图、
+验证缺失选择器的错误码，并检查登录墙。2026-11-03 在本机（Chrome 156）跑通，同时暴露并修掉了四个真 bug：
+
+1. 连的是 **browser 级** WebSocket，`Page.enable` 在那一层不存在——必须连 page target；
+2. `currentUrl` 用 `Runtime.evaluate` 取，BOSS 的页面会卡住渲染线程（15s 无响应）——改走
+   `Page.getNavigationHistory`，浏览器侧不看渲染线程脸色；
+3. 首次访问 BOSS 时 `Page.loadEventFired` 可能迟迟不来——导航改为「load 或主框架提交后稳定 800ms」；
+4. 未登录时 BOSS 重定向到 `/web/user/`，但重定向**晚于**框架提交——登录检查改为最多轮询 1.25s。
+
+`pnpm smoke:cdp` 只能证明浏览器链路与登录墙，**证明不了**简历字段、岗位列表、点击投递——那些仍要账号。
+
 ---
 
 ## 18. 性能预算

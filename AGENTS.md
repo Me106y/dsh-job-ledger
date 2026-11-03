@@ -38,6 +38,7 @@ ls src/ledger src/tools    # 关键模块是否存在
 | 跑测试 | `pnpm test` |
 | 构建 | `pnpm build` |
 | 硬规则扫描 | `pnpm lint:rules`（重放请求 / 合成点击 / 第二写者 / 原生依赖） |
+| 浏览器链路冒烟 | `pnpm smoke:cdp`（真实 Chrome，不需要账号） |
 | 全量门禁 | `pnpm check`（lint:rules + typecheck + test + build） |
 
 - 测试直接用 `node --test test/*.test.ts` 跑 TypeScript：**不引入测试框架**，也不需要先 build。
