@@ -1,0 +1,34 @@
+{
+  "code": 0,
+  "message": "Success",
+  "zpData": {
+    "jobList": [
+      {
+        "encryptJobId": "job_a1",
+        "jobName": "后端工程师",
+        "brandName": "字节跳动",
+        "cityName": "深圳",
+        "salaryDesc": "25-35K·13薪"
+      },
+      {
+        "encryptJobId": "job_a2",
+        "jobName": "高级后端工程师（急招）",
+        "brandName": "北京市字节跳动科技有限公司",
+        "cityName": "深圳市",
+        "salaryDesc": "30-45K"
+      },
+      {
+        "encryptJobId": "job_a3",
+        "jobName": "销售代表",
+        "brandName": "某贸易公司",
+        "cityName": "深圳",
+        "salaryDesc": "8-12K"
+      },
+      {
+        "encryptJobId": "job_a4",
+        "jobName": "无公司名的岗位",
+        "cityName": "深圳"
+      }
+    ]
+  }
+}

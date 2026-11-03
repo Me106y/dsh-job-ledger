@@ -52,10 +52,12 @@ export class FakeTransport implements CdpTransport {
 }
 
 /** Payloads keyed by the endpoint they belong to. */
-export interface ResumePayloads {
-  readonly baseinfo: unknown
-  readonly expect: unknown
-  readonly status: unknown
+export interface BrowserPayloads {
+  readonly baseinfo?: unknown
+  readonly expect?: unknown
+  readonly status?: unknown
+  readonly search?: unknown
+  readonly recommend?: unknown
 }
 
 /**
@@ -73,10 +75,10 @@ export class ReplayBrowser implements BrowserReader {
   /** Number of captures armed at the moment `navigate` was called. */
   capturesAtNavigate: number | undefined
 
-  #payloads: ResumePayloads
+  #payloads: BrowserPayloads
 
   /** @param payloads what each endpoint returns */
-  constructor(payloads: ResumePayloads) {
+  constructor(payloads: BrowserPayloads) {
     this.#payloads = payloads
   }
 
@@ -91,6 +93,8 @@ export class ReplayBrowser implements BrowserReader {
   async capture(pattern: RegExp): Promise<unknown> {
     this.patterns.push(pattern)
     const source = pattern.source
+    if (source.includes('joblist')) return this.#payloads.search
+    if (source.includes('recommend')) return this.#payloads.recommend
     if (source.includes('baseinfo')) return this.#payloads.baseinfo
     if (source.includes('expect')) return this.#payloads.expect
     return this.#payloads.status
