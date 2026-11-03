@@ -271,7 +271,7 @@ test('a second concurrent run is refused while the first is in flight', async (t
   assert.equal(result.outcome, 'done')
 })
 
-test('evidence that cannot be written fails the job and halts the run', async (t) => {
+test('evidence that cannot be written leaves the job uncertain and halts the run', async (t) => {
   const { ledger, dataDir } = setup(t)
   const jobs = seedJobs(ledger, 1)
   const applier = new FakeApplier(() => ({}))
@@ -283,8 +283,12 @@ test('evidence that cannot be written fails the job and halts the run', async (t
 
   assert.equal(result.outcome, 'halted')
   assert.equal(result.haltReason, 'ledger-write')
+  // Not `failed`: the network confirmed the send, and a failed job is eligible to be applied to
+  // again — which would duplicate a real application.
   const app = [...ledger.projection.apps.values()][0]
-  assert.equal(app?.state, 'failed')
+  assert.equal(app?.state, 'uncertain')
+  assert.equal(result.summary.uncertain, 1)
+  assert.equal(result.summary.failed, 0)
 })
 
 test("today's submissions count attempts made today, not replies arriving today", (t) => {

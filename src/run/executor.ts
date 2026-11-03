@@ -226,8 +226,12 @@ export class JobRunner {
         ledger.append({ type: 'lease/release', jobId: job.id, at: new Date(this.#clock()).toISOString() })
       }
 
-      if (outcome.kind === 'submitted') summary.submitted += 1
-      else if (outcome.kind === 'uncertain') summary.uncertain += 1
+      // Count what was actually recorded, not the outcome kind: an evidence failure after a
+      // confirmed send halts the run but leaves the application `uncertain`, and the summary has
+      // to agree with the ledger.
+      const recorded = ledger.projection.apps.get(appId)?.state
+      if (recorded === 'submitted') summary.submitted += 1
+      else if (recorded === 'uncertain') summary.uncertain += 1
       else summary.failed += 1
 
       const decision = observe(breaker, outcome)
@@ -281,17 +285,32 @@ export class JobRunner {
       })
 
       if (verdict.kind === 'submitted') {
-        const evidence = await this.#applier.capture()
-        const path = saveEvidence(this.#dataDir, appId, evidence.png)
-        this.#ledger.append({
-          type: 'app/state',
-          appId,
-          state: 'submitted',
-          note: chatSnippet(evidence.chat),
-          evidence: path,
-          at: new Date(this.#clock()).toISOString(),
-        })
-        return { kind: 'submitted' }
+        try {
+          const evidence = await this.#applier.capture()
+          const path = saveEvidence(this.#dataDir, appId, evidence.png)
+          this.#ledger.append({
+            type: 'app/state',
+            appId,
+            state: 'submitted',
+            note: chatSnippet(evidence.chat),
+            evidence: path,
+            at: new Date(this.#clock()).toISOString(),
+          })
+          return { kind: 'submitted' }
+        } catch (error) {
+          // The send is confirmed by the network; only the proof is missing. Recording `failed`
+          // would make the job eligible again and re-applying would duplicate a real application,
+          // so it becomes `uncertain`: terminal until a human checks the platform.
+          const code = error instanceof PluginError ? error.code : 'E_BODY_UNAVAILABLE'
+          this.#ledger.append({
+            type: 'app/state',
+            appId,
+            state: 'uncertain',
+            note: `${userMessage(code)}（证据写入失败）`,
+            at: new Date(this.#clock()).toISOString(),
+          })
+          return { kind: 'halt', reason: code === 'E_LEDGER_WRITE' ? 'ledger-write' : 'uncertain' }
+        }
       }
 
       if (verdict.kind === 'uncertain') {
