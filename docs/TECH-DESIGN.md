@@ -212,6 +212,11 @@ api ───┼─► run ─► cdp(boss) ─► chrome/network
 3. 轮询 /json/version，最多 15s，每 200ms；起不来 → E_CHROME_NOT_STARTED
 ```
 
+**登录态（实现）**：profile 固定在 `dataDir/chrome-profile`，cookie 跨进程复用，「扫一次」是真的。
+检测到登录墙时 `job_ledger_login` 打开 `/web/user/` 等待扫码（默认 3 分钟，可传 `timeoutSeconds`），
+**URL 离开登录页**即视为成功（真机观察：未登录访问任意 geek 页都会重定向到 `/web/user/`）；超时返回
+`E_LOGIN_REQUIRED`，不假装成功。cookie 过期就再扫一次——插件不会替用户登录。
+
 **关键点**：
 
 - **必须用独立 `user-data-dir`**。Chrome 136+ 起，对默认 profile 打开远程调试会被拒绝；而我们本来就要独立 profile 存 BOSS 登录态，两者正好一致。
@@ -847,6 +852,7 @@ App
 | `job_ledger_discover` | `{ source?: 'search'\|'recommend', limit?: number }` | `{added, duplicates, filtered, suspects}` |
 | `job_ledger_queue` | `{ filter?: 'new'\|'suspect'\|'filtered', limit?: number }` | 行数组 |
 | `job_ledger_apply` | `{ ids: string[] }` | run 结果 |
+| `job_ledger_login` | `{ timeoutSeconds? }` | 登录状态（等待扫码，默认 180s） |
 | `job_ledger_record` | `{ appId?, jobId?, state, note? }` | 新状态（给 jobId 时取该岗位最近一次申请） |
 | `job_ledger_reconcile` | `{ backfill?: boolean }` | 差异摘要 |
 | `job_ledger_report` | `{ format?: 'table'\|'md' }` | 报表 |
@@ -989,7 +995,9 @@ interface BrowserPort {
 5. 对账 → 差异 0。
 
 **不需要账号的那一半已经自动化**：`pnpm smoke:cdp` 启动真实 Chrome、连 CDP、打开 BOSS、读 DOM、截图、
-验证缺失选择器的错误码，并检查登录墙。2026-11-03 在本机（Chrome 156）跑通，同时暴露并修掉了四个真 bug：
+验证缺失选择器的错误码，检查登录墙，并在一个本地测试页上验证两件事：**点击是可信事件**
+（`event.isTrusted === true`，即没有用合成 `.click()`）与**数据来自页面自己发出的请求**（arm 后导航，
+捕获到页面自身 `fetch` 的响应）。2026-11-03 在本机（Chrome 156）跑通，同时暴露并修掉了四个真 bug：
 
 1. 连的是 **browser 级** WebSocket，`Page.enable` 在那一层不存在——必须连 page target；
 2. `currentUrl` 用 `Runtime.evaluate` 取，BOSS 的页面会卡住渲染线程（15s 无响应）——改走
