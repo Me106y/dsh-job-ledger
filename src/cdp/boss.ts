@@ -41,6 +41,8 @@ export const BOSS_API = {
   searchList: /\/wapi\/zpgeek\/search\/joblist\.json(?:\?|$)/,
   /** The recommendation rail the search page also loads. */
   recommendList: /\/wapi\/zpgeek\/pc\/recommend\/job\/list\.json(?:\?|$)/,
+  /** The delivered-applications list used for reconciliation. */
+  deliverList: /\/wapi\/zpgeek\/geek\/deliver\/list\.json(?:\?|$)/,
   /**
    * The request the page fires when an application is sent.
    *

@@ -58,6 +58,7 @@ export interface BrowserPayloads {
   readonly status?: unknown
   readonly search?: unknown
   readonly recommend?: unknown
+  readonly deliver?: unknown
 }
 
 /**
@@ -93,6 +94,7 @@ export class ReplayBrowser implements BrowserReader {
   async capture(pattern: RegExp): Promise<unknown> {
     this.patterns.push(pattern)
     const source = pattern.source
+    if (source.includes('deliver')) return this.#payloads.deliver
     if (source.includes('joblist')) return this.#payloads.search
     if (source.includes('recommend')) return this.#payloads.recommend
     if (source.includes('baseinfo')) return this.#payloads.baseinfo
