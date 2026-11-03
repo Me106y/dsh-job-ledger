@@ -56,7 +56,7 @@ function dataDir(t: { after(fn: () => void): void }, suffix: string): string {
   return dir
 }
 
-test('mounting the plugin registers all eight tools', (t) => {
+test('mounting the plugin registers all nine tools', (t) => {
   const dir = dataDir(t, 'mount')
   const { ctx, registered, dispose } = context()
   t.after(dispose)
@@ -72,6 +72,7 @@ test('mounting the plugin registers all eight tools', (t) => {
       'job_ledger_profile',
       'job_ledger_queue',
       'job_ledger_reconcile',
+      'job_ledger_record',
       'job_ledger_report',
       'job_ledger_resume',
     ],

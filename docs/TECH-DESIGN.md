@@ -847,7 +847,7 @@ App
 | `job_ledger_discover` | `{ source?: 'search'\|'recommend', limit?: number }` | `{added, duplicates, filtered, suspects}` |
 | `job_ledger_queue` | `{ filter?: 'new'\|'suspect'\|'filtered', limit?: number }` | 行数组 |
 | `job_ledger_apply` | `{ ids: string[] }` | run 结果 |
-| `job_ledger_record` | `{ appId, state, note? }` | 新状态 |
+| `job_ledger_record` | `{ appId?, jobId?, state, note? }` | 新状态（给 jobId 时取该岗位最近一次申请） |
 | `job_ledger_reconcile` | `{ backfill?: boolean }` | 差异摘要 |
 | `job_ledger_report` | `{ format?: 'table'\|'md' }` | 报表 |
 
