@@ -8,7 +8,7 @@ import { ingestJobs } from '../../src/discover/ingest.ts'
 import type { RawJob } from '../../src/discover/parse.ts'
 import { QUEUE_LIMIT, queueRows, queueTotal } from '../../src/ledger/queue.ts'
 import { Ledger } from '../../src/ledger/store.ts'
-import { makeJob } from '../fixtures/helpers.ts'
+import { makeApp, makeJob } from '../fixtures/helpers.ts'
 
 const NOW = Date.parse('2026-11-03T00:00:00.000Z')
 
@@ -141,4 +141,58 @@ test('a job with no verdict never shows up as a candidate', (t) => {
     assert.equal(queueRows(ledger.projection, filter).length, 0)
     assert.equal(queueTotal(ledger.projection, filter), 0)
   }
+})
+
+test('a job that already has an application leaves the queue', (t) => {
+  const ledger = tempLedger(t)
+  ingestJobs(ledger, BATCH, { now: NOW, newId: counter() })
+  const job = queueRows(ledger.projection, 'new')[0]
+  assert.ok(job !== undefined)
+  assert.equal(queueRows(ledger.projection, 'new', QUEUE_LIMIT, NOW).length, 1)
+
+  ledger.append({
+    type: 'app/create',
+    app: { ...makeApp(job.jobId, 'submitted'), id: 'a_submitted' },
+    at: new Date(NOW).toISOString(),
+  })
+
+  assert.equal(queueRows(ledger.projection, 'new', QUEUE_LIMIT, NOW).length, 0)
+  assert.equal(queueTotal(ledger.projection, 'new', NOW), 0)
+})
+
+test('a failed application comes back, an uncertain one does not', (t) => {
+  const ledger = tempLedger(t)
+  ingestJobs(ledger, BATCH, { now: NOW, newId: counter() })
+  const job = queueRows(ledger.projection, 'new')[0]
+  assert.ok(job !== undefined)
+  const at = new Date(NOW).toISOString()
+
+  ledger.append({ type: 'app/create', app: { ...makeApp(job.jobId, 'failed'), id: 'a_failed' }, at })
+  assert.equal(queueRows(ledger.projection, 'new', QUEUE_LIMIT, NOW).length, 1)
+
+  ledger.append({
+    type: 'app/create',
+    app: { ...makeApp(job.jobId, 'uncertain'), id: 'a_uncertain' },
+    at,
+  })
+  assert.equal(queueRows(ledger.projection, 'new', QUEUE_LIMIT, NOW).length, 0)
+})
+
+test('a job under a live lease is not offered while it is being clicked', (t) => {
+  const ledger = tempLedger(t)
+  ingestJobs(ledger, BATCH, { now: NOW, newId: counter() })
+  const job = queueRows(ledger.projection, 'new')[0]
+  assert.ok(job !== undefined)
+
+  ledger.append({
+    type: 'lease/grant',
+    jobId: job.jobId,
+    owner: 'r_1',
+    expiresAt: new Date(NOW + 60_000).toISOString(),
+    at: new Date(NOW).toISOString(),
+  })
+
+  assert.equal(queueRows(ledger.projection, 'new', QUEUE_LIMIT, NOW).length, 0)
+  // Once the lease expires the row is a candidate again.
+  assert.equal(queueRows(ledger.projection, 'new', QUEUE_LIMIT, NOW + 120_000).length, 1)
 })
