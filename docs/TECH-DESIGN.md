@@ -581,6 +581,9 @@ run 内累计投递 > 单轮上限(10) → 停止，剩余回 queued
 
 **上限不可配置**（写死），防止用户一时冲动改大。
 
+**实现**：`src/run/pacing.ts`，纯函数，随机源可注入以便测试。额度检查是**整批拒绝**而不是截断：
+截断会让用户勾选的一部分静默不投，比"今天只剩 3 个额度"更难解释。
+
 ### 9.4 熔断
 
 触发条件（任一）：
@@ -592,6 +595,10 @@ run 内累计投递 > 单轮上限(10) → 停止，剩余回 queued
 | 页面出现验证码 | `captcha` |
 | 连续 2 次 `failed` | `consecutive-failures` |
 | CDP 断开 / Chrome 退出 | `cdp-disconnected` |
+
+**实现**：`src/run/breaker.ts`，`observe(state, outcome)` 是纯函数折叠。`uncertain` 与显式 halt 立即停；
+`failed` 累计到 2 次停；业务码、验证码、CDP 断开由执行层映射成 `HaltReason` 后以 `halt` 传入——
+数字到语义的映射留在平台适配层，熔断器不认识 BOSS 的错误码。
 
 熔断后：
 - 写 `run/halt` 事件（含 reason 与当时的截图）；
@@ -851,6 +858,7 @@ Skill 不是文档，是**约束**。每条约束都要有对应的工具侧校�
 | `E_LEDGER_WRITE` | 账本写入失败 | 熔断，提示检查磁盘 |
 | `E_LEDGER_VERSION` | 账本由更新版本的插件写入 | 拒绝启动，提示升级插件 |
 | `E_LEDGER_STATE` | 账本状态异常（未知 id、重复 app id、结构不完整事件） | 拒绝该操作/启动，报出实体与位置 |
+| `E_INVALID_ARGUMENT` | 参数不合法（如 ids 为空或超过单轮上限） | 拒绝该调用，报出期望范围 |
 
 ---
 
