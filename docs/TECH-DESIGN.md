@@ -306,6 +306,10 @@ export const BOSS = {
 
 **为什么以网络为准**：DOM 会因改版失效，而"简历确实发出去了"的权威证据是平台自己的响应。DOM 只是辅助确认。反过来如果只有 DOM 没有网络证据，也要判 `uncertain`——宁可不确定，不可假成功。
 
+**实现**：`src/run/attempt.ts` 的 `judgeAttempt(signals)` 是纯函数，输入是"点了没有 / 网络信号 / DOM 是否见到卡片"，
+输出的判定表与上面四条分支一一对应；`haltReasonForFailure(code)` 只把 `isFatal` 的码映射成 `HaltReason`，
+执行层不需要记住哪几个码是整轮级的。
+
 ### 5.7 证据
 
 ```
@@ -316,6 +320,10 @@ Page.captureScreenshot { format:'png', captureBeyondViewport:false }
 ```
 
 同时把聊天流文本片段（`innerText`，截断 500 字）写进事件的 `note`，便于日后核对。
+
+**实现**：`src/run/evidence.ts`。截图写 `0600`、目录 `0700`；事件里只存相对路径。
+证据写不进去视为 fatal（`E_LEDGER_WRITE`）——继续跑就等于记录一批"没有证据的 submitted"，
+正是设计要消灭的状态。
 
 ### 5.8 错误与恢复
 
