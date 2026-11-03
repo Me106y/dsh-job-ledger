@@ -44,7 +44,8 @@ export interface ClaimInput {
  */
 export function claimVerdict(input: ClaimInput): ClaimVerdict {
   if (input.blockingApp !== undefined) return { ok: false, code: 'E_ALREADY_APPLIED' }
-  if (input.lease !== undefined && Date.parse(input.lease.expiresAt) > input.now) {
+  // TECH §6.5: only `expiresAt < now` is free; the boundary tick still belongs to the holder.
+  if (input.lease !== undefined && Date.parse(input.lease.expiresAt) >= input.now) {
     return { ok: false, code: 'E_LEASE_HELD', holder: input.lease.owner }
   }
   return { ok: true }
