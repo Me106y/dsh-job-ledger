@@ -9,7 +9,7 @@
  * @module dsh-job-ledger/tools/login
  */
 
-import { BOSS_SELECTORS, BOSS_URLS, isLoginUrl } from '../cdp/boss.ts'
+import { BOSS_SELECTORS, BOSS_URLS, isBossUrl, isLoginUrl } from '../cdp/boss.ts'
 import { waitForLogin, waitForLoginPage } from '../cdp/login.ts'
 import type { ReaderProvider } from '../runtime/browser.ts'
 import { PluginError, userMessage } from '../shared/errors.ts'
@@ -34,6 +34,15 @@ export type LoginToolResult =
 /** Knobs tests pin. */
 export interface LoginToolOptions {
   readonly timeoutMs?: number | undefined
+  /**
+   * How long to look for the login wall after opening a protected page.
+   *
+   * The first navigation in a cold profile is slow (DNS, TLS, the SPA boot), and BOSS redirects to
+   * the wall only once the app runs — observed at ~4 s on a fresh `--user-data-dir`, well after the
+   * 1.25 s guard used on page reads. A short probe reports "already logged in" while the window
+   * that is actually open shows the QR code.
+   */
+  readonly probeMs?: number | undefined
   readonly pollMs?: number | undefined
   readonly sleep?: ((ms: number) => Promise<void>) | undefined
 }
@@ -54,7 +63,19 @@ export async function loginForModel(
 
     const before = await reader.currentUrl()
     if (!isLoginUrl(before)) {
-      return { ok: true, alreadyLoggedIn: true, url: before }
+      if (isBossUrl(before)) {
+        return { ok: true, alreadyLoggedIn: true, url: before }
+      }
+
+      // A freshly launched browser reports `about:blank`; "not the login page" there says nothing
+      // about the session. Ask a page that requires one and wait for the redirect if it comes.
+      await reader.navigate(BOSS_URLS.resume)
+      const wall = await waitForLoginPage(reader, {
+        timeoutMs: options.probeMs ?? 8_000,
+        ...(options.pollMs === undefined ? {} : { pollMs: options.pollMs }),
+        ...(options.sleep === undefined ? {} : { sleep: options.sleep }),
+      })
+      if (!wall) return { ok: true, alreadyLoggedIn: true, url: await reader.currentUrl() }
     }
 
     // Put the QR code in front of the person: the window may be on a page that only shows a splash.

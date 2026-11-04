@@ -127,3 +127,16 @@ export function assertBossSuccess(payload: unknown): void {
 export function isLoginUrl(url: string): boolean {
   return /\/web\/user\/|\/login/i.test(url)
 }
+
+/**
+ * Whether a URL is a page on the platform at all.
+ *
+ * A freshly launched browser sits on `about:blank`; "not the login page" there is not evidence of a
+ * session, so callers have to distinguish "a BOSS page that is not the login wall" from "no page".
+ *
+ * @param url page URL
+ * @returns whether the URL belongs to zhipin.com
+ */
+export function isBossUrl(url: string): boolean {
+  return /^https:\/\/(?:[^/]+\.)?zhipin\.com\//i.test(url)
+}

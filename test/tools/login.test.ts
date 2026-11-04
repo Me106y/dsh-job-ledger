@@ -23,7 +23,7 @@ function providerWith(urls: readonly string[]): { provider: ReaderProvider; brow
   return { provider: { reader: async () => browser }, browser }
 }
 
-const FAST: LoginToolOptions = { timeoutMs: 5_000, pollMs: 0, sleep: async () => undefined }
+const FAST: LoginToolOptions = { timeoutMs: 5_000, probeMs: 0, pollMs: 0, sleep: async () => undefined }
 
 test('a valid session is reported without opening the login page', async () => {
   const { provider, browser } = providerWith([JOB])
@@ -32,6 +32,32 @@ test('a valid session is reported without opening the login page', async () => {
 
   assert.deepEqual(result, { ok: true, alreadyLoggedIn: true, url: JOB })
   assert.equal(browser.navigated, undefined)
+})
+
+test('a fresh browser is confirmed on a protected page before reporting a session', async () => {
+  const { provider, browser } = providerWith(['about:blank', 'https://www.zhipin.com/web/geek/resume'])
+
+  const result = await loginForModel(provider, FAST)
+
+  assert.equal(result.ok, true)
+  if (!result.ok) return
+  assert.equal(result.alreadyLoggedIn, true)
+  assert.equal(browser.navigated, BOSS_URLS.resume)
+})
+
+test('about:blank on a logged-out browser opens the QR page instead of claiming success', async () => {
+  const { provider, browser } = providerWith([
+    'about:blank',
+    ...Array<string>(10).fill(LOGIN),
+    JOB,
+  ])
+
+  const result = await loginForModel(provider, FAST)
+
+  assert.equal(result.ok, true)
+  if (!result.ok) return
+  assert.equal(result.alreadyLoggedIn, false)
+  assert.equal(browser.navigated, BOSS_URLS.login)
 })
 
 test('a login wall puts the QR page in front and waits for the redirect away', async () => {
