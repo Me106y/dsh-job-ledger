@@ -37,6 +37,8 @@ test('the queue view carries the row facts and the tab badges', (t) => {
   assert.equal(view.rows.length, 1)
   assert.equal(view.rows[0]?.salary, '25-35K')
   assert.equal(view.rows[0]?.decision, 'new')
+  // The title links to the posting's own page.
+  assert.match(view.rows[0]?.url ?? '', /^https:\/\/www\.zhipin\.com\/job_detail\//)
   assert.equal(view.filtered, 1)
   assert.equal(view.suspects, 0)
   assert.ok(view.revision > 0)

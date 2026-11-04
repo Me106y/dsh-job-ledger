@@ -900,6 +900,7 @@ App
 
 ### 12.4 交互细节
 
+- 职位标题是外链：`QueueView.url` 来自岗位的 `job.url`，`target="_blank" rel="noreferrer noopener"` 在用户自己的浏览器里打开平台原页，不动投递用的专用 Chrome；
 - 投递按钮文案随选择变化：`投递 3 个`；未选时禁用并提示"先勾选岗位"；只投勾选项（PRD §15 #32）；
 - **更新**（`POST queue/update`）：按 `SettingsStore.profile` 调 `discoverForModel()`，返回计数 + 新清单；运行中禁用；
   失败显示结构化文案（`E_LOGIN_REQUIRED` 引导扫码），保留原清单；成功后头部展示"新增 N / 判重 N / 过滤 N / 疑似 N"；

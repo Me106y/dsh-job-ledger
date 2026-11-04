@@ -142,6 +142,8 @@ export const CSS = `
 @media (prefers-reduced-motion: no-preference) { .jl-row { transition: background 120ms ease; } }
 .jl-check { width: 16px; height: 16px; accent-color: var(--jl-accent); margin: 0; }
 .jl-row-title { font-weight: 600; font-size: 14px; }
+.jl-row-link { color: inherit; text-decoration: none; border-bottom: 1px solid transparent; }
+.jl-row-link:hover { color: var(--jl-accent); border-bottom-color: currentColor; }
 .jl-row-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 2px; color: var(--jl-muted); font-size: 12px; }
 .jl-sep { color: var(--jl-faint); }
 .jl-tag { padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; background: var(--jl-surface-2); border: 1px solid var(--jl-line); color: var(--jl-muted); }
