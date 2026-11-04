@@ -126,8 +126,9 @@ test('the response is armed before the click that triggers it', async () => {
 })
 
 test('a full send clicks, types the greeting, and reports the card', async () => {
-  const port = readyPort()
-  const applier = new BossApplier(port)
+  // A platform that does not greet on its own: the button never turns into 继续沟通.
+  const port = readyPort({ contactLabels: ['立即沟通'] })
+  const applier = new BossApplier(port, { contactSettleMs: 0, contactDeadlineMs: 0 })
 
   const result = await applier.send(JOB, '你好，我想投递')
 
@@ -188,8 +189,9 @@ test('an optional send-resume button is clicked when present', async () => {
       BOSS_SELECTORS.sendResumeButton,
       BOSS_SELECTORS.resumeCard,
     ],
+    contactLabels: ['立即沟通'],
   })
-  await new BossApplier(port).send(JOB, '你好')
+  await new BossApplier(port, { contactSettleMs: 0, contactDeadlineMs: 0 }).send(JOB, '你好')
 
   assert.ok(port.calls.includes(`click:${BOSS_SELECTORS.sendResumeButton}`))
 })
@@ -249,4 +251,13 @@ test('a contact that already turned into 继续沟通 is clicked once', async ()
 
   const clicks = port.calls.filter((call) => call === `click:${BOSS_SELECTORS.contactButton}`)
   assert.equal(clicks.length, 1)
+})
+
+test('the contact click keeps retrying until the button turns into 继续沟通', async () => {
+  const { applier, port } = fastApplier({ contactLabels: ['立即沟通', '立即沟通', '继续沟通'] })
+
+  await applier.send(JOB, '你好')
+
+  const clicks = port.calls.filter((call) => call === `click:${BOSS_SELECTORS.contactButton}`)
+  assert.equal(clicks.length, 3)
 })
