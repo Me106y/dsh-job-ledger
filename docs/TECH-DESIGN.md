@@ -4,7 +4,7 @@
 |---|---|
 | 版本 | v0.1 |
 | 日期 | 2026-11-03 |
-| 对应 PRD | [PRD.md](./PRD.md) v0.4（31 项决策） |
+| 对应 PRD | [PRD.md](./PRD.md) v0.5（34 项决策） |
 | 读者 | 实现者（自己）、未来的协作者、评审 |
 | 范围 | 只覆盖 v0.1（仅 BOSS、单平台、双端） |
 
@@ -137,6 +137,7 @@ src/
 ├─ ledger/
 │  ├─ events.ts             # 事件类型 + 版本
 │  ├─ store.ts              # 追加、fsync、重放、索引
+│  ├─ skip.ts               # 待投删除：写 job/status = skipped（#34）
 │  └─ project.ts            # 内存投影
 ├─ dedupe/
 │  ├─ normalize.ts fingerprint.ts simhash.ts
@@ -764,14 +765,17 @@ export interface Api {
   'POST reconcile/run': { response: ReconcileView }
   'POST profile': { body: { roles?: string[]; cities?: string[]; salaryMin?: number }
                     response: SettingsView }
+  'POST queue/update': { body?: { source?: 'search'|'recommend' }; response: QueueUpdateView }
+  'POST jobs/:id/skip': { response: { jobId: string; status: 'skipped' } }
   'POST reconcile/ack': { body: { jobIds: string[] }; response: { acknowledged: number } }
   'POST apps/:id/state': { body: { state: AppState; note?: string }; response: { appId: string; state: AppState } }
 }
 ```
 
 **P5 已实现**：`GET queue / overview / reconcile / run / profile`、`POST run/start`、`POST reconcile/run`、
-`POST apps/:id/state`、`POST profile`。`run/pause`、`run/resume`、`run/halt` **没有实现**——executor 还不能暂停一轮，
-返回 409 会撒谎，所以先不提供；`reconcile/ack` 不落库，改由客户端本地记忆（差异列表本来就不持久化）。
+`POST apps/:id/state`、`POST profile`、`POST queue/update`、`POST jobs/:id/skip`。`run/pause`、`run/resume`、`run/halt`
+**没有实现**——executor 还不能暂停一轮，返回 409 会撒谎，所以先不提供；`reconcile/ack` 不落库，改由客户端本地记忆
+（差异列表本来就不持久化）。
 
 视图类型（只读投影，均为小对象）：
 
@@ -780,6 +784,10 @@ interface QueueRow { jobId: string; title: string; company: string; city: string
   salary: string; reason: 'new'|'suspect'; duplicateOf?: string
   blocked?: 'leased'|'cooldown' }
 interface QueueView { revision: number; rows: QueueRow[]; suspects: number; filtered: number }
+// `POST queue/update` 的结果：一次发现的计数 + 发现后的清单，客户端一次渲染完
+interface QueueUpdateView { revision: number; source: 'search'|'recommend'
+  added: number; duplicates: number; filtered: number; suspects: number; invalid: number
+  queue: QueueView }
 interface OverviewView { revision: number; today: { submitted: number; quota: number }
   uncertain: number; discrepancies: number; repliedYesterday: number; run: RunView }
 interface ReconcileView { revision: number
@@ -796,6 +804,8 @@ interface SettingsView { revision: number
 
 - `POST run/start` 两次 → 第二次 `409 E_RUN_ACTIVE`；
 - `POST apps/:id/state` 带非法转移 → `409 E_ILLEGAL_TRANSITION`（返回 `allowed` 列表）；
+- `POST queue/update` 在一轮投递进行中 → `409 E_RUN_ACTIVE`：发现与点击共用同一个浏览器页面，不能同时导航；
+- `POST jobs/:id/skip` 幂等（已 `skipped` 时不再追加事件）；已投递 → `409 E_ALREADY_APPLIED`，租约在身 → `409 E_LEASE_HELD`；
 - 所有写命令幂等于"当前状态检查"，不引入 requestId（单用户场景，成本不划算）。
 
 **实现**：`src/api/handlers.ts` 是一个纯分发器：`{ method, path, query, body, headers } → { status, body }`。
@@ -836,7 +846,7 @@ export function apply(ctx) {
 App
 ├─ Header:   标题 + 运行状态 pill + 今日已投/额度
 ├─ TabBar:   待投 | 概览 | 对账差异（带差异数 badge） | 设置
-├─ <Queue/>       全选/反选、行内理由、粘底操作条（已选 N/10 + 投递）
+├─ <Queue/>       全选/反选、行内理由、行内「删除」、头部「更新」、粘底操作条（已选 N/10 + 投递）
 ├─ <Overview/>    5 个数字卡片 + 目标摘要 + 当前 run 状态条
 ├─ <Reconcile/>   两个列表 + "重新对账"
 └─ <Settings/>    目标岗位 / 城市（标签输入）+ 薪资下限 + 保存
@@ -859,10 +869,16 @@ App
 **待投的准入规则（实现）**：`queueRows()` 只返回**还能投**的岗位——已申请（submitted 及之后的所有阻断状态）或正在被点击（租约有效）的行不出现。
 原因：投递后决策事件不会变，若不过滤，已投过的岗位会永远留在待投清单里，面板会一直劝你再投一次。
 `failed` 不阻断，所以它会回来；`uncertain` 阻断，只在别处等人工核对。
+被用户删除的岗位写 `job/status = skipped`，状态不再是 `new`，因此不会再进任何待投视图，也不受后续更新影响。
 
 ### 12.4 交互细节
 
-- 投递按钮文案随选择变化：`投递 3 个`；未选时禁用并提示"先勾选岗位"；
+- 投递按钮文案随选择变化：`投递 3 个`；未选时禁用并提示"先勾选岗位"；只投勾选项（PRD §15 #32）；
+- **更新**（`POST queue/update`）：按 `SettingsStore.profile` 调 `discoverForModel()`，返回计数 + 新清单；运行中禁用；
+  失败显示结构化文案（`E_LOGIN_REQUIRED` 引导扫码），保留原清单；成功后头部展示"新增 N / 判重 N / 过滤 N / 疑似 N"；
+- **删除**（`POST jobs/:id/skip`）：写 `job/status = skipped`；行立即从本地清单消失（轮询未回来前也不闪回），
+  成功后自动触发一次「更新」补满；连续删除用短防抖合并成一次补满；运行中禁用；
+  `applying` 之后（含 `uncertain`）的岗位 host 拒绝删除，返回 `E_ILLEGAL_TRANSITION`；
 - 点击后**不弹二次确认**（勾选本身就是确认），但 `halted` 后"继续"要确认（避免误触恢复风控中的账号）；
 - 疑似重复行有"看对比"入口：展开显示 `duplicateOf` 的目标岗位标题与相似度；
 - 所有失败显示 `code` 对应的中文文案 + "复制诊断"按钮（把 code + values 复制到剪贴板，便于反馈）。
@@ -872,6 +888,7 @@ App
 | 场景 | 文案 |
 |---|---|
 | 未登录 | "需要先登录 BOSS：点这里打开浏览器扫码" |
+| 清单为空 | "没有可投的岗位。点「更新」按当前目标（岗位 / 城市 / 薪资）抓一页。" |
 | 今日额度用完 | "今天已投 30 个，明天继续。剩余 N 个岗位已排队。" |
 | 无新岗位 | "没有新岗位。最近一次发现：{时间}，共 {n} 条全部被判重或过滤。" |
 | 对账平账 | "已平账，无需处理。" |
