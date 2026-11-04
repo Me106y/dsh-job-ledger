@@ -234,14 +234,17 @@ export class CdpReader implements BrowserPort {
       // Fall through: a browser that answers evaluate but not history still works.
     }
 
-    const result = await this.#session.call<{
-      result?: { value?: unknown }
-    }>('Runtime.evaluate', { expression: 'location.href', returnByValue: true }, 5_000)
-    const value = result.result?.value
-    if (typeof value !== 'string') {
-      throw new PluginError('E_BODY_UNAVAILABLE', { what: 'location.href' })
+    try {
+      const result = await this.#session.call<{
+        result?: { value?: unknown }
+      }>('Runtime.evaluate', { expression: 'location.href', returnByValue: true }, 5_000)
+      const value = result.result?.value
+      return typeof value === 'string' ? value : ''
+    } catch {
+      // Mid-navigation the renderer cannot answer; "unknown" is not a failure of the click that
+      // caused it. Callers treat an empty URL as "not the login wall".
+      return ''
     }
-    return value
   }
 
   /**
@@ -278,7 +281,12 @@ export class CdpReader implements BrowserPort {
   }
 
   /**
-   * Click through real input events, retrying once because layout can move under the cursor.
+   * Click through real input events, once.
+   *
+   * A button that navigates (立即沟通 → the chat page) is gone right after the click, and while the
+   * new document loads even `Runtime.evaluate` can fail. Neither means the click missed: it means
+   * the page acted on it. So the element is only reported missing when it never appeared, and the
+   * dispatch is retried once only when *dispatching* itself failed.
    *
    * @param selector CSS selector
    * @param timeoutMs how long to wait for the element
@@ -286,42 +294,55 @@ export class CdpReader implements BrowserPort {
    */
   async click(selector: string, timeoutMs = 10_000): Promise<void> {
     const deadline = Date.now() + timeoutMs
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      let centre = await this.#elementCentre(selector)
-      while (centre === undefined && Date.now() < deadline) {
-        await delay(DOM_POLL_MS)
-        centre = await this.#elementCentre(selector)
-      }
-      if (centre === undefined) break
+    const centre = await this.#waitForCentre(selector, deadline)
+    if (centre === undefined) throw new PluginError('E_SELECTOR_MISSING', { what: selector })
 
-      await this.#session.call('Input.dispatchMouseEvent', {
-        type: 'mouseMoved',
-        x: centre.x,
-        y: centre.y,
-      })
+    const dispatch = async (point: { x: number; y: number }): Promise<void> => {
+      await this.#session.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: point.x, y: point.y })
       await this.#session.call('Input.dispatchMouseEvent', {
         type: 'mousePressed',
-        x: centre.x,
-        y: centre.y,
+        x: point.x,
+        y: point.y,
         button: 'left',
         clickCount: 1,
       })
       await this.#session.call('Input.dispatchMouseEvent', {
         type: 'mouseReleased',
-        x: centre.x,
-        y: centre.y,
+        x: point.x,
+        y: point.y,
         button: 'left',
         clickCount: 1,
       })
-
-      // A button that navigates (立即沟通 → chat) disappears *because* the click worked. Treating
-      // that as a miss retried the click and then failed an application that had already been
-      // sent — the ledger said "failed" for a message the platform delivered.
-      await delay(DOM_SETTLE_MS)
-      const stillThere = await this.#elementCentre(selector)
-      if (stillThere === undefined) return
     }
-    throw new PluginError('E_SELECTOR_MISSING', { what: selector })
+
+    try {
+      await dispatch(centre)
+    } catch {
+      // The page may have been mid-navigation; one more attempt is enough, and a second miss
+      // still reports the selector rather than pretending the click happened.
+      const again = await this.#waitForCentre(selector, deadline)
+      if (again === undefined) throw new PluginError('E_SELECTOR_MISSING', { what: selector })
+      await dispatch(again)
+    }
+    // Let the page react before the caller reads it; a failure to evaluate here is the navigation
+    // the click caused, not an error.
+    await delay(DOM_SETTLE_MS)
+  }
+
+  /**
+   * Poll for an element's clickable centre, tolerating a page that is navigating.
+   *
+   * @param selector CSS selector
+   * @param deadline epoch ms
+   * @returns the centre, or undefined when it never appeared
+   */
+  async #waitForCentre(selector: string, deadline: number): Promise<{ x: number; y: number } | undefined> {
+    for (;;) {
+      const centre = await this.#elementCentre(selector).catch(() => undefined)
+      if (centre !== undefined) return centre
+      if (Date.now() >= deadline) return undefined
+      await delay(DOM_POLL_MS)
+    }
   }
 
   /**
