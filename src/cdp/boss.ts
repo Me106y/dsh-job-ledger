@@ -122,13 +122,14 @@ export const BOSS_SELECTORS = {
    * `<div class="switch-tip">APP扫码登录</div>` inside `.btn-sign-switch.ewm-switch`.
    */
   loginQrSwitch: '.btn-sign-switch',
-  /** 立即沟通 on the job detail page. */
+  /** 立即沟通 on the job detail page. Its `redirect-url` is the chat the click opens. */
   contactButton: '.btn-startchat, .op-btn-chat, a.btn-startchat',
-  greetingInput: '.chat-input textarea, textarea.input-area, #chat-input',
-  sendButton: '.chat-op .btn-send, .btn-send',
+  /** The composer is a `contenteditable` div on the chat page, not a textarea. */
+  greetingInput: '#chat-input, .chat-input[contenteditable="true"], .chat-input textarea, textarea.input-area',
+  sendButton: '.btn-sendimg, .btn-send, .chat-op .btn-send',
   /** Optional second step: some page versions send the resume from a toolbar button. */
   sendResumeButton: '.toolbar .btn-send-resume, .send-resume',
-  chatPanel: '.chat-container, .chat-content, .dialog-container',
+  chatPanel: '.chat-conversation, .chat-container, .chat-content, .dialog-container',
   resumeCard: '.message-card .card-resume, .resume-card, [class*="resume-card"]',
 } as const
 

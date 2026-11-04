@@ -78,9 +78,17 @@ export class BossApplier implements JobApplier {
 
     await this.#port.click(BOSS_SELECTORS.contactButton)
 
-    if (await this.#port.waitFor(BOSS_SELECTORS.greetingInput, this.#timings.greetTimeoutMs)) {
+    // 立即沟通 sends the platform's own greeting and *then* opens the chat. Typing our greeting on
+    // that page would send a second message to the same recruiter, so the typing step only runs
+    // when the click stayed on the job page (an in-page composer) instead of navigating to chat.
+    const openedChat = /\/web\/geek\/chat/.test(await this.#port.currentUrl())
+    if (!openedChat && (await this.#port.waitFor(BOSS_SELECTORS.greetingInput, this.#timings.greetTimeoutMs))) {
       await this.#port.typeText(BOSS_SELECTORS.greetingInput, greeting)
-      await this.#port.click(BOSS_SELECTORS.sendButton)
+      try {
+        await this.#port.click(BOSS_SELECTORS.sendButton)
+      } catch {
+        // The greeting may already be out; the network signal below decides the verdict.
+      }
       if (
         await this.#port.waitFor(BOSS_SELECTORS.sendResumeButton, this.#timings.resumeButtonTimeoutMs)
       ) {
