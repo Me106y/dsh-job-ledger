@@ -26,6 +26,8 @@ export interface QueueRowView {
   readonly city: string
   /** Salary as shown by the platform, empty when absent. */
   readonly salary: string
+  /** The posting's own page; the title links to it. */
+  readonly url?: string
   readonly reason: string
   readonly decision: 'new' | 'suspect'
   readonly duplicateOf?: string

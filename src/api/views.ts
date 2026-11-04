@@ -77,6 +77,7 @@ export function queueView(
     // A row in this view is either a plain candidate or a suspect; filtered rows live elsewhere.
     decision: row.decision === 'suspect' ? 'suspect' : 'new',
     ...(row.duplicateOf === undefined ? {} : { duplicateOf: row.duplicateOf }),
+    ...(row.url === undefined ? {} : { url: row.url }),
     firstSeenAt: row.firstSeenAt,
   }))
 

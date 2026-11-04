@@ -201,7 +201,23 @@ export function Queue({ running, t }: ScreenProps): ReactElement {
                   }}
                 />
                 <div>
-                  <div className="jl-row-title">{row.title}</div>
+                  <div className="jl-row-title">
+                    {row.url !== undefined && /^https?:\/\//.test(row.url) ? (
+                      // The platform page is the source of truth for "what is this job"; open it in
+                      // the person's own browser instead of driving their tab.
+                      <a
+                        className="jl-row-link"
+                        href={row.url}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        title={`${t('openOnBoss')}：${row.title}`}
+                      >
+                        {row.title}
+                      </a>
+                    ) : (
+                      row.title
+                    )}
+                  </div>
                   <div className="jl-row-meta">
                     <span>{row.company}</span>
                     {row.city === '' ? null : (

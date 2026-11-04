@@ -40,6 +40,8 @@ export interface QueueRow {
   readonly duplicateOf?: string
   readonly source: JobSource
   readonly firstSeenAt: string
+  /** Platform page for the posting; the panel opens it so the person can read the real thing. */
+  readonly url?: string
 }
 
 /**
@@ -88,6 +90,7 @@ export function queueRows(
       ...(verdict.duplicateOf === undefined ? {} : { duplicateOf: verdict.duplicateOf }),
       source: job.source,
       firstSeenAt: job.firstSeenAt,
+      ...(job.url === undefined ? {} : { url: job.url }),
     })
   }
 
