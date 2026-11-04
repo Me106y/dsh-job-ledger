@@ -36,6 +36,8 @@ export const ERROR_MESSAGES = {
   E_INVALID_ARGUMENT: '参数不合法：{what}',
   E_PRIVACY_BLOCKED: '隐私设置为 redacted，改成 full 后才能读取简历原文',
   E_NOT_CONFIGURED: '插件还没有完成首次配置',
+  E_TRACKER_PATH: '投递表路径不可用：{what}',
+  E_TRACKER_SHEET: '投递表读写失败：{what}',
 } as const
 
 /** A failure code from {@link ERROR_MESSAGES}. */

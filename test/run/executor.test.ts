@@ -311,3 +311,35 @@ test('the applied-state list used by the claim check is the documented one', () 
     assert.ok(BLOCKING_STATES.includes(state))
   }
 })
+
+test('the submitted hook runs per application and a throwing hook never fails the run', async (t) => {
+  const { ledger, dataDir } = setup(t)
+  const jobs = seedJobs(ledger, 2)
+  const applier = new FakeApplier(() => ({}))
+  const seen: string[] = []
+  let appSeq = 0
+  const machine = new JobRunner({
+    ledger,
+    applier,
+    dataDir,
+    greeting: () => '你好',
+    clock: () => NOW,
+    newAppId: () => {
+      appSeq += 1
+      return `a_${String(appSeq)}`
+    },
+    newRunId: () => 'r_1',
+    sleep: async () => {},
+    onSubmitted: (job, appId) => {
+      seen.push(`${appId}:${job.id}`)
+      // A tracker sheet that cannot be written must not turn a confirmed application into a failure.
+      throw new Error('sheet unavailable')
+    },
+  })
+
+  const result = await machine.run({ ids: jobs.map((job) => job.id), grantedBy: { kind: 'panel', at: AT } })
+
+  assert.equal(result.outcome, 'done')
+  assert.equal(result.summary.submitted, 2)
+  assert.equal(seen.length, 2)
+})

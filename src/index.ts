@@ -25,6 +25,7 @@ import { recoverInterrupted } from './run/recovery.ts'
 import { readResume } from './resume/read.ts'
 import type { Resume } from './resume/parse.ts'
 import { createApi } from './api/handlers.ts'
+import { trackerRow, writeTrackerRows } from './tracker/sheet.ts'
 import { mountApi } from './api/mount.ts'
 import type { WebServerLike } from './api/mount.ts'
 import { createRunTracker } from './api/views.ts'
@@ -249,11 +250,22 @@ export function apply(ctx: Context, config: ConfigInput = {}): void {
 
   const greeting = createGreeting(runtime)
 
+  // Every `submitted` is copied into the user's tracker sheet when one is configured. Best-effort:
+  // the ledger already recorded the application, so a failed write only shows up on the next sync.
+  const onSubmitted = (job: Job, appId: string): void => {
+    const path = settings.profile.tracker.path
+    if (path === '') return
+    const app = ledger.projection.apps.get(appId)
+    if (app === undefined) return
+    void writeTrackerRows(path, [trackerRow(job, app)]).catch(() => {})
+  }
+
   const runner = new JobRunner({
     ledger,
     applier: createApplier(async () => runtime.reader()),
     dataDir: resolved.dataDir,
     greeting,
+    onSubmitted,
   })
 
   registerResumeTool(ctx, runtime, resolved)

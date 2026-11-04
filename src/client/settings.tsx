@@ -12,7 +12,7 @@
 import { useEffect, useState } from 'react'
 import type { ReactElement } from 'react'
 
-import type { SettingsView } from '../api/contract.ts'
+import type { SettingsView, TrackerSyncView } from '../api/contract.ts'
 import { postApi } from './api.ts'
 import type { MessageKey } from './locales.ts'
 
@@ -105,20 +105,38 @@ export function Settings({
   const [roles, setRoles] = useState<string[]>([])
   const [cities, setCities] = useState<string[]>([])
   const [salary, setSalary] = useState('0')
+  const [trackerPath, setTrackerPath] = useState('')
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | undefined>(undefined)
+  const [syncing, setSyncing] = useState(false)
+  const [synced, setSynced] = useState<string | undefined>(undefined)
 
   useEffect(() => {
     if (view === undefined) return
     setRoles([...view.target.roles])
     setCities([...view.target.cities])
     setSalary(String(view.target.salaryMin))
+    setTrackerPath(view.tracker.path)
   }, [view])
 
   const touch = (): void => {
     setSaved(false)
     setError(undefined)
+    setSynced(undefined)
+  }
+
+  const sync = async (): Promise<void> => {
+    setSyncing(true)
+    setError(undefined)
+    setSynced(undefined)
+    const result = await postApi<TrackerSyncView>('tracker/sync', {})
+    setSyncing(false)
+    if (result.ok) {
+      setSynced(t('trackerSynced', { imported: result.value.imported, written: result.value.written }))
+    } else {
+      setError(result.failure.error)
+    }
   }
 
   const save = async (): Promise<void> => {
@@ -130,7 +148,7 @@ export function Settings({
     }
     setBusy(true)
     setError(undefined)
-    const result = await postApi<SettingsView>('profile', { roles, cities, salaryMin })
+    const result = await postApi<SettingsView>('profile', { roles, cities, salaryMin, trackerPath })
     setBusy(false)
     if (result.ok) {
       onSaved(result.value)
@@ -195,6 +213,35 @@ export function Settings({
             }}
           />
           <span className="jl-help">{t('salaryFloorHint')}</span>
+        </div>
+
+        <div className="jl-field">
+          <label className="jl-label" htmlFor="jl-tracker">
+            {t('trackerPath')}
+          </label>
+          <input
+            id="jl-tracker"
+            className="jl-input jl-input-wide"
+            type="text"
+            value={trackerPath}
+            placeholder={t('trackerPathPlaceholder')}
+            onChange={(event) => {
+              touch()
+              setTrackerPath(event.target.value)
+            }}
+          />
+          <span className="jl-help">{t('trackerPathHint')}</span>
+          <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+            <button
+              type="button"
+              className="jl-btn"
+              disabled={syncing || view === undefined || view.tracker.path === ''}
+              onClick={() => void sync()}
+            >
+              {syncing ? t('trackerSyncing') : t('trackerSync')}
+            </button>
+            {synced === undefined ? null : <span className="jl-saved">{synced}</span>}
+          </span>
         </div>
 
         <div className="jl-form-foot">

@@ -18,6 +18,7 @@ import { DAILY_CAP } from '../run/pacing.ts'
 import type { SettingsStore } from '../settings.ts'
 import { MAX_SALARY_MIN } from '../settings.ts'
 import { LIMITS } from '../shared/profile.ts'
+import { trackerFormat } from '../tracker/sheet.ts'
 import type {
   OverviewView,
   QueueRowView,
@@ -191,6 +192,7 @@ export function blockedReason(
  */
 export function settingsView(settings: SettingsStore, revision: number): SettingsView {
   const target = settings.target
+  const path = settings.profile.tracker.path
   return {
     revision,
     target: {
@@ -198,6 +200,7 @@ export function settingsView(settings: SettingsStore, revision: number): Setting
       cities: [...target.cities],
       salaryMin: target.salaryMin,
     },
+    tracker: { path, format: trackerFormat(path) ?? 'none' },
     limits: { runSize: LIMITS.runSize, daily: LIMITS.daily, salaryMinMax: MAX_SALARY_MIN },
   }
 }

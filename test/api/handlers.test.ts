@@ -14,6 +14,7 @@ import { Ledger } from '../../src/ledger/store.ts'
 import type { ReaderProvider } from '../../src/runtime/browser.ts'
 import type { RunRequest, RunResult } from '../../src/run/executor.ts'
 import { makeApp, makeJob } from '../fixtures/helpers.ts'
+import { makeXlsx } from '../fixtures/xlsx.ts'
 import { ReplayBrowser } from '../fixtures/transports.ts'
 
 const NOW = Date.parse('2026-11-03T00:00:00.000Z')
@@ -22,6 +23,8 @@ const AT = new Date(NOW).toISOString()
 const deliver = JSON.parse(
   readFileSync(fileURLToPath(new URL('../fixtures/cdp/deliver-list.json', import.meta.url)), 'utf8'),
 ) as unknown
+
+import { writeFileSync } from 'node:fs'
 
 const search = JSON.parse(
   readFileSync(fileURLToPath(new URL('../fixtures/cdp/search.json', import.meta.url)), 'utf8'),
@@ -318,4 +321,55 @@ test('skipping an applied posting is 409, an unknown id is 400', async (t) => {
   const unknown = await api({ method: 'POST', path: 'jobs/j_missing/skip' })
   assert.equal(unknown.status, 400)
   assert.equal((unknown.body as { code: string }).code, 'E_INVALID_ARGUMENT')
+})
+
+test('the tracker path is validated when saved and reported by GET tracker', async (t) => {
+  const ledger = tempLedger(t)
+  const api = apiFor(ledger)
+  const dir = mkdtempSync(join(tmpdir(), 'job-ledger-tracker-api-'))
+  t.after(() => rmSync(dir, { recursive: true, force: true }))
+  const path = join(dir, 'tracker.xlsx')
+  writeFileSync(path, makeXlsx(['公司', '岗位', 'Base地'], [['美团', '后端工程师', '上海']]))
+
+  const bad = await api({ method: 'POST', path: 'profile', body: { trackerPath: `${dir}/nope.xlsx` } })
+  assert.equal(bad.status, 400)
+  assert.equal((bad.body as { code: string }).code, 'E_TRACKER_PATH')
+
+  const saved = await api({ method: 'POST', path: 'profile', body: { trackerPath: path } })
+  assert.equal(saved.status, 200)
+  const settings = saved.body as { tracker: { path: string; format: string } }
+  assert.equal(settings.tracker.format, 'xlsx')
+
+  const view = await api({ method: 'GET', path: 'tracker' })
+  assert.equal(view.status, 200)
+  assert.deepEqual((view.body as { headers: string[] }).headers, ['公司', '岗位', 'Base地'])
+})
+
+test('tracker/sync imports history and writes the ledger application into the sheet', async (t) => {
+  const ledger = tempLedger(t)
+  const api = apiFor(ledger)
+  const dir = mkdtempSync(join(tmpdir(), 'job-ledger-tracker-sync-'))
+  t.after(() => rmSync(dir, { recursive: true, force: true }))
+  const path = join(dir, 'tracker.xlsx')
+  writeFileSync(path, makeXlsx(['公司', '岗位', 'Base地', '投递日期', '状态'], [['快手', 'AI 全栈', '北京', '9.20', '简历挂']]))
+  await api({ method: 'POST', path: 'profile', body: { trackerPath: path } })
+
+  const job = makeJob({ id: 'j_1', company: '美团', title: '后端工程师', city: '上海' })
+  ledger.append({ type: 'job/add', job, at: AT })
+  ledger.append({ type: 'app/create', app: makeApp(job.id, 'submitted'), at: AT })
+
+  const result = await api({ method: 'POST', path: 'tracker/sync' })
+
+  assert.equal(result.status, 200)
+  assert.deepEqual(result.body, { revision: ledger.projection.revision, imported: 1, matched: 0, written: 1 })
+})
+
+test('tracker/sync without a configured sheet is a coded 400', async (t) => {
+  const ledger = tempLedger(t)
+  const api = apiFor(ledger)
+
+  const result = await api({ method: 'POST', path: 'tracker/sync' })
+
+  assert.equal(result.status, 400)
+  assert.equal((result.body as { code: string }).code, 'E_TRACKER_PATH')
 })

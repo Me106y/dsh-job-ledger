@@ -121,6 +121,27 @@ export interface SettingsView {
     readonly daily: number
     readonly salaryMinMax: number
   }
+  /** The user's own tracker sheet (PRD §5.11). `none` means the path is empty or unsupported. */
+  readonly tracker: { readonly path: string; readonly format: 'xlsx' | 'numbers' | 'none' }
+}
+
+/** GET tracker: whether the configured sheet can be read, and what it looks like. */
+export interface TrackerView {
+  readonly revision: number
+  readonly path: string
+  readonly format: 'xlsx' | 'numbers' | 'none'
+  /** Header cells of the first sheet, so the panel can show what was recognised. */
+  readonly headers: readonly string[]
+  /** Present when the last read failed; the panel shows it instead of pretending the sheet is fine. */
+  readonly error?: { readonly code: string; readonly message: string }
+}
+
+/** POST tracker/sync: one two-way pass. */
+export interface TrackerSyncView {
+  readonly revision: number
+  readonly imported: number
+  readonly matched: number
+  readonly written: number
 }
 
 /**
@@ -141,13 +162,23 @@ export interface Api {
   'POST run/start': { body: { ids: string[] }; response: RunView }
   'POST reconcile/run': { response: ReconcileView }
   'POST profile': {
-    body: { roles?: readonly string[]; cities?: readonly string[]; salaryMin?: number }
+    body: {
+      roles?: readonly string[]
+      cities?: readonly string[]
+      salaryMin?: number
+      /** Tracker sheet path; an empty string turns the feature off. */
+      trackerPath?: string
+    }
     response: SettingsView
   }
   /** One discovery pass with the current target; never applies. */
   'POST queue/update': { body?: { source?: 'search' | 'recommend' }; response: QueueUpdateView }
   /** Delete one pending posting: appends `job/status = skipped`. */
   'POST jobs/:id/skip': { response: { jobId: string; status: 'skipped' } }
+  /** Read the configured tracker sheet's header. */
+  'GET tracker': { response: TrackerView }
+  /** Import the sheet's history and write new applications into it. */
+  'POST tracker/sync': { response: TrackerSyncView }
   'POST apps/:id/state': {
     body: { state: AppState; note?: string }
     response: { appId: string; state: AppState }

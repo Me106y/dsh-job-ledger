@@ -198,6 +198,7 @@ export const CSS = `
 .jl-tag-input { flex: 1 1 140px; min-width: 120px; border: 0; outline: none; background: transparent; padding: 4px; font-size: 13px; }
 .jl-tag-input:focus-visible { outline: none; }
 .jl-tags:focus-within { border-color: var(--jl-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--jl-accent) 18%, transparent); }
+.jl-input-wide { width: 100%; max-width: 560px; }
 .jl-input { width: 140px; padding: 8px 10px; border: 1px solid var(--jl-line); border-radius: 10px; background: var(--jl-surface); font-size: 13px; }
 .jl-form-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .jl-note { color: var(--jl-muted); font-size: 12px; }

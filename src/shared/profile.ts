@@ -50,6 +50,11 @@ export interface Profile {
     /** Page cap for `geekDeliverList`; backfill stops here and says so. */
     readonly maxPages: number
   }
+  /** The user's own tracker sheet (PRD §5.11). Empty means the feature is off. */
+  readonly tracker: {
+    /** Absolute path to an `.xlsx` or `.numbers` file. */
+    readonly path: string
+  }
 }
 
 /** Deep partial used by `mergeProfile`: a patch may touch one leaf without restating the rest. */
@@ -69,6 +74,7 @@ export const DEFAULT_PROFILE: Profile = {
   dedupe: { cooldownDays: 90, simhashDistance: 3 },
   privacy: { resumeExposure: 'redacted' },
   reconcile: { maxPages: 10 },
+  tracker: { path: '' },
 }
 
 /**
@@ -86,5 +92,6 @@ export function mergeProfile(base: Profile, patch: ProfilePatch): Profile {
   const dedupe = { ...base.dedupe, ...(patch.dedupe ?? {}) }
   const privacy = { ...base.privacy, ...(patch.privacy ?? {}) }
   const reconcile = { ...base.reconcile, ...(patch.reconcile ?? {}) }
-  return { target, dedupe, privacy, reconcile }
+  const tracker = { ...base.tracker, ...(patch.tracker ?? {}) }
+  return { target, dedupe, privacy, reconcile, tracker }
 }

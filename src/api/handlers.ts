@@ -22,6 +22,8 @@ import type { SettingsStore } from '../settings.ts'
 import { parseSettingsInput } from '../settings.ts'
 import { PluginError, userMessage } from '../shared/errors.ts'
 import { discoverForModel } from '../tools/discover.ts'
+import { assertTrackerPath, readTracker, trackerFormat } from '../tracker/sheet.ts'
+import { syncTracker } from '../tracker/sync.ts'
 import type { DiscoverySource } from '../discover/read.ts'
 import { reconcileForModel } from '../tools/reconcile.ts'
 import type { RunStarter } from '../tools/apply.ts'
@@ -30,6 +32,8 @@ import type {
   OverviewView,
   QueueUpdateView,
   QueueView,
+  TrackerSyncView,
+  TrackerView,
   ReconcileView,
   RunView,
   SettingsView,
@@ -104,7 +108,10 @@ function statusFor(code: PluginError['code']): number {
       return 409
     case 'E_INVALID_ARGUMENT':
     case 'E_NOT_CONFIGURED':
+    case 'E_TRACKER_PATH':
       return 400
+    case 'E_TRACKER_SHEET':
+      return 502
     case 'E_LOGIN_REQUIRED':
     case 'E_STOKEN_EXPIRED':
       return 401
@@ -223,7 +230,10 @@ export function createApi(deps: ApiDeps): ApiHandlers {
       }
 
       if (route === 'POST profile') {
-        deps.settings.update(parseSettingsInput(request.body), clock())
+        const input = parseSettingsInput(request.body)
+        // A path that does not exist (or is not a sheet) is rejected at save time, not after a run.
+        if (input.trackerPath !== undefined && input.trackerPath !== '') assertTrackerPath(input.trackerPath)
+        deps.settings.update(input, clock())
         return {
           status: 200,
           body: settingsView(deps.settings, deps.ledger.projection.revision) satisfies SettingsView,
@@ -319,6 +329,34 @@ export function createApi(deps: ApiDeps): ApiHandlers {
           suspects: discovered.suspects,
           invalid: discovered.invalid,
           queue: queueView(deps.ledger.projection, 'new', QUEUE_PAGE_LIMIT),
+        }
+        return { status: 200, body: view }
+      }
+
+      if (route === 'GET tracker') {
+        const path = deps.settings.profile.tracker.path
+        const format = trackerFormat(path) ?? 'none'
+        const base: TrackerView = { revision: deps.ledger.projection.revision, path, format, headers: [] }
+        if (path === '' || format === 'none') return { status: 200, body: base }
+        try {
+          const data = await readTracker(path)
+          return { status: 200, body: { ...base, headers: [...data.header] } }
+        } catch (error) {
+          const code = error instanceof PluginError ? error.code : 'E_TRACKER_SHEET'
+          const values = error instanceof PluginError ? error.values : undefined
+          return { status: 200, body: { ...base, error: { code, message: userMessage(code, values) } } }
+        }
+      }
+
+      if (route === 'POST tracker/sync') {
+        const path = deps.settings.profile.tracker.path
+        if (path === '') throw new PluginError('E_TRACKER_PATH', { what: '还没有配置投递表' })
+        const synced = await syncTracker(deps.ledger, path, clock())
+        const view: TrackerSyncView = {
+          revision: deps.ledger.projection.revision,
+          imported: synced.imported,
+          matched: synced.matched,
+          written: synced.written,
         }
         return { status: 200, body: view }
       }

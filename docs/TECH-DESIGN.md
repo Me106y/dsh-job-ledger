@@ -139,6 +139,11 @@ src/
 │  ├─ store.ts              # 追加、fsync、重放、索引
 │  ├─ skip.ts               # 待投删除：写 job/status = skipped（#34）
 │  └─ project.ts            # 内存投影
+├─ tracker/                 # 投递表（PRD §5.11）
+│  ├─ sheet.ts              # 列名对齐、路径校验、行形状
+│  ├─ xlsx.ts zip.ts        # 无依赖的最小 OOXML/ZIP 读写
+│  ├─ numbers.ts            # AppleScript 驱动 Numbers
+│  └─ sync.ts               # 双向同步
 ├─ dedupe/
 │  ├─ normalize.ts fingerprint.ts simhash.ts
 │  └─ decide.ts             # 三级判定（纯函数）
@@ -735,6 +740,14 @@ if (ledgerSaysRejected && platformHas) /* 不动 */
 
 ---
 
+### 10.5 投递表同步（PRD §5.11）
+
+- 读：`.xlsx` 走 `tracker/xlsx.ts`（ZIP + OOXML，只用 Node 内置 `zlib`）；`.numbers` 走 `tracker/numbers.ts`（`osascript` 驱动 Numbers.app，不解析二进制）。
+- 写：只改匹配到的行，其余行与归档其余部件原样复制；同一个 ZIP 重新打包后原子替换。
+- 历史导入复用 `reconcile()`，标 `reconcile-backfill`：参与判重，不进转化率（#15）。
+- 失败：写表失败**不改投递状态**；面板显示 `E_TRACKER_*`，下一次「立即同步」重试。
+- 每次 `submitted` 由 executor 的 `onSubmitted` 回调顺手写一行（不阻塞投递）。
+
 ## 11. Host API 契约
 
 ### 11.1 约定
@@ -1127,5 +1140,6 @@ interface BrowserPort {
 | 8 | 简历三接口（`baseinfo` / `expect` / `status`）的响应字段名 | 登录后打开简历页，导出三个响应体 | 决定 `src/resume/parse.ts` 的映射；P1 先用合成 fixture 实现，并对字段名做别名兜底 |
 | 9 | 岗位列表接口是否带 JD 文本 | 抓一页 `joblist.json` 看字段 | 决定首次发现能否用 SimHash；P2 按"不带"实现，此时只靠指纹判重 |
 | 10 | JD 里的「匹配点」怎么抽 | 抓几个真实 JD，看硬性要求有没有可枚举的形态 | 决定 `{匹配点}` 能否自动填；目前只能由模型提议值并通过原文校验 |
+| 11 | `.numbers` 的 AppleScript 路径在**换机器**后是否可用 | 另一台装了 Numbers 的 Mac 上跑一次「立即同步」，确认自动化授权与 `addRowBelow` 行为一致 | 决定 `tracker/numbers.ts` 是否需要按系统版本分支；已在本机（Numbers 26，文件名被重命名）实测追加与更新两条路径 |
 
 **建议**：P1 开始前，花 30 分钟做完第 1–4、7 项抓包（手动投一次即可），把结果补进本文 §5.3 与 §5.6。抓包结果决定 P3 的 30% 工作量。
