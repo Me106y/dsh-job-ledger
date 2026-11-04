@@ -66,33 +66,40 @@ test('GET profile reports the effective target and the hard limits', async (t) =
   assert.equal(result.status, 200)
   const body = result.body as {
     target: { roles: string[]; cities: string[]; salaryMin: number }
-    limits: { runSize: number; daily: number }
+    limits: { runSize: number; daily: number; salaryMinMax: number }
   }
   assert.deepEqual(body.target, { roles: [], cities: [], salaryMin: 0 })
-  assert.deepEqual(body.limits, { runSize: 10, daily: 30 })
+  assert.deepEqual(body.limits, { runSize: 10, daily: 30, salaryMinMax: 999_999 })
 })
 
-test('POST profile saves the target and the next GET sees it', async (t) => {
+test('POST profile accepts a salary floor in yuan', async (t) => {
   const fixtureValue = fixture(t)
   const call = apiFor(fixtureValue)
 
   const saved = await call({
     method: 'POST',
     path: 'profile',
-    body: { roles: ['后端开发'], cities: ['上海', '杭州'], salaryMin: 20 },
+    body: { roles: ['后端开发'], cities: ['上海', '杭州'], salaryMin: 15_000 },
   })
   assert.equal(saved.status, 200)
-  assert.deepEqual((saved.body as { target: { roles: string[] } }).target.roles, ['后端开发'])
+  const savedBody = saved.body as {
+    target: { roles: string[]; cities: string[]; salaryMin: number }
+  }
+  assert.deepEqual(savedBody.target, {
+    roles: ['后端开发'],
+    cities: ['上海', '杭州'],
+    salaryMin: 15_000,
+  })
 
   const read = await call({ method: 'GET', path: 'profile' })
-  assert.deepEqual((read.body as { target: { cities: string[] } }).target.cities, ['上海', '杭州'])
+  assert.deepEqual((read.body as typeof savedBody).target, savedBody.target)
 })
 
 test('POST profile appends one profile/set event the next boot replays', async (t) => {
   const value = fixture(t)
   const call = apiFor(value)
 
-  await call({ method: 'POST', path: 'profile', body: { salaryMin: 18 } })
+  await call({ method: 'POST', path: 'profile', body: { salaryMin: 18_000 } })
 
   const lines = readFileSync(join(value.dir, 'events.jsonl'), 'utf8')
     .trim()
@@ -100,7 +107,7 @@ test('POST profile appends one profile/set event the next boot replays', async (
     .map((line) => JSON.parse(line) as { type: string; profile?: { target?: { salaryMin?: number } } })
   const saved = lines.filter((line) => line.type === 'profile/set')
   assert.equal(saved.length, 1)
-  assert.equal(saved[0]?.profile?.target?.salaryMin, 18)
+  assert.equal(saved[0]?.profile?.target?.salaryMin, 18_000)
 })
 
 test('an invalid target is a 400, not a partial save', async (t) => {

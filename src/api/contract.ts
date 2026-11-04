@@ -94,8 +94,15 @@ export interface SettingsView {
     readonly cities: readonly string[]
     readonly salaryMin: number
   }
-  /** Hard ceilings, shown for context; never writable. */
-  readonly limits: { readonly runSize: number; readonly daily: number }
+  /**
+   * Hard ceilings, shown for context; never writable. `salaryMinMax` is the bound the host accepts
+   * for `target.salaryMin`, so the form can refuse an out-of-range value before the request.
+   */
+  readonly limits: {
+    readonly runSize: number
+    readonly daily: number
+    readonly salaryMinMax: number
+  }
 }
 
 /**

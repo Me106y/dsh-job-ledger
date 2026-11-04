@@ -16,6 +16,7 @@ import type { QueueFilter } from '../ledger/queue.ts'
 import { todaySubmissions } from '../run/executor.ts'
 import { DAILY_CAP } from '../run/pacing.ts'
 import type { SettingsStore } from '../settings.ts'
+import { MAX_SALARY_MIN } from '../settings.ts'
 import { LIMITS } from '../shared/profile.ts'
 import type {
   OverviewView,
@@ -197,6 +198,6 @@ export function settingsView(settings: SettingsStore, revision: number): Setting
       cities: [...target.cities],
       salaryMin: target.salaryMin,
     },
-    limits: { runSize: LIMITS.runSize, daily: LIMITS.daily },
+    limits: { runSize: LIMITS.runSize, daily: LIMITS.daily, salaryMinMax: MAX_SALARY_MIN },
   }
 }

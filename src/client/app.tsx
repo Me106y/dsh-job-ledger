@@ -20,14 +20,18 @@ import type { MessageKey } from './locales.ts'
 /** Props every screen receives. */
 export interface ScreenProps {
   readonly running: boolean
-  readonly t: (key: MessageKey) => string
+  readonly t: (key: MessageKey, params?: Readonly<Record<string, string | number>>) => string
 }
 
 /**
  * @param props translation function
  * @returns the whole panel
  */
-export function App({ t }: { readonly t: (key: MessageKey) => string }): ReactElement {
+export function App({
+  t,
+}: {
+  readonly t: (key: MessageKey, params?: Readonly<Record<string, string | number>>) => string
+}): ReactElement {
   const [tab, setTab] = useState<Tab>('queue')
   const [settings, setSettings] = useState<SettingsView | undefined>(undefined)
   const [active, setActive] = useState(false)

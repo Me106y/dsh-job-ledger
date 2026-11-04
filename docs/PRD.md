@@ -310,7 +310,7 @@ new ─► queued ─► applying ─┬─► submitted ─┬─► replied �
 - 面板保存的是 `profile/set` 事件（§6）——与投递记录写同一份 `events.jsonl`，只追加、带时间戳，重放即可恢复，不引入第二个配置文件。
 - 读取优先级：`profile/set`（面板，后写覆盖）> `cordis.patch.yml` 的 `config.target` > 默认值。
 - 面板只写 `target.roles`、`target.cities`、`target.salaryMin`；排除关键词、公司黑名单、隐私与判重阈值仍只走 YAML。
-- 校验在 host：角色 / 城市各 ≤ 10 项、单项 ≤ 30 字、薪资下限 0–999；非法请求返回 `E_INVALID_ARGUMENT` 且不写账本。
+- 校验在 host：角色 / 城市各 ≤ 10 项、单项 ≤ 30 字、薪资下限 0–999999（元/月，与 `target.salaryMin` 及岗位 `salaryMin` 同单位）；非法请求返回 `E_INVALID_ARGUMENT` 且不写账本。
 - 城市是**硬过滤**（非空时只保留这些城市）；搜索城市仍跟随站点当前选择，不在本次范围。
 
 **投递 run 状态机（面板与对话共用）：**

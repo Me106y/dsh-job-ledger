@@ -1,8 +1,10 @@
 /**
  * 设置 screen: the target the tools and discovery read (PRD §5.10).
  *
- * The form is the only writer of `settings.json`; the YAML stays the bootstrap layer and this file
- * wins over it. Saving is a POST, so the values are persisted before the UI says "saved".
+ * Settings are ledger events, not a config file: saving appends a `profile/set` event through the
+ * host and the YAML stays the bootstrap layer below it. Saving is a POST, so the values are
+ * persisted before the UI says "saved". The salary floor shares its unit with the rest of the
+ * plugin: yuan per month, never K.
  *
  * @module dsh-job-ledger/client/settings
  */
@@ -97,7 +99,7 @@ export function Settings({
   onSaved,
 }: {
   readonly view: SettingsView | undefined
-  readonly t: (key: MessageKey) => string
+  readonly t: (key: MessageKey, params?: Readonly<Record<string, string | number>>) => string
   readonly onSaved: (next: SettingsView) => void
 }): ReactElement {
   const [roles, setRoles] = useState<string[]>([])
@@ -121,8 +123,9 @@ export function Settings({
 
   const save = async (): Promise<void> => {
     const salaryMin = Number(salary === '' ? '0' : salary)
-    if (!Number.isInteger(salaryMin) || salaryMin < 0 || salaryMin > 999) {
-      setError(t('salaryFloorHint'))
+    const salaryMax = view?.limits.salaryMinMax
+    if (salaryMax === undefined || !Number.isInteger(salaryMin) || salaryMin < 0 || salaryMin > salaryMax) {
+      setError(t('salaryFloorInvalid', { max: salaryMax ?? 0 }))
       return
     }
     setBusy(true)
@@ -184,7 +187,7 @@ export function Settings({
             className="jl-input"
             type="number"
             min={0}
-            max={999}
+            max={view?.limits.salaryMinMax}
             value={salary}
             onChange={(event) => {
               touch()

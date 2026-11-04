@@ -48,7 +48,10 @@ export const inject = ['slots', 'locale']
  * @param ctx client context
  */
 export function apply(ctx: ClientContext): void {
-  const t = ctx.locale.bind(NS) as (key: MessageKey) => string
+  const t = ctx.locale.bind(NS) as (
+    key: MessageKey,
+    params?: Readonly<Record<string, string | number>>,
+  ) => string
 
   ctx.effect(() => {
     ctx.locale.register(NS, messages)

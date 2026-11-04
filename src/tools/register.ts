@@ -560,7 +560,7 @@ export function profileTool(config: LedgerConfig, source: ProfileSource) {
         return [
           {
             type: 'text',
-            text: `目标：${roles} · 城市 ${view.target.cities.join('、') || '不限'} · 薪资 ≥ ${String(view.target.salaryMin)} · 单轮 ${String(view.limits.runSize)} / 每日 ${String(view.limits.daily)}`,
+            text: `目标：${roles} · 城市 ${view.target.cities.join('、') || '不限'} · 薪资 ≥ ${String(view.target.salaryMin)} 元/月 · 单轮 ${String(view.limits.runSize)} / 每日 ${String(view.limits.daily)}`,
           },
         ]
       },

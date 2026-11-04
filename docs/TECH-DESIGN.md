@@ -789,7 +789,7 @@ interface RunView { runId?: string; state: 'idle'|'queued'|'running'|'paused'|'h
   total: number; done: number; current?: string; haltReason?: string; startedAt?: string }
 interface SettingsView { revision: number
   target: { roles: string[]; cities: string[]; salaryMin: number }
-  limits: { runSize: number; daily: number } }
+  limits: { runSize: number; daily: number; salaryMinMax: number } }
 ```
 
 ### 11.3 并发与幂等
@@ -924,7 +924,7 @@ Skill 不是文档，是**约束**。每条约束都要有对应的工具侧校�
     target:
       roles: []                        # 空 = 取自在线简历 expected
       cities: []
-      salaryMin: 0
+      salaryMin: 0                      # 元/月；与岗位 salaryMin 同单位
       excludeKeywords: [销售, 外包, 驻场, 培训, 中介, 保险]
       companyBlacklist: []
     limits:
