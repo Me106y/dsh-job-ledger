@@ -37,6 +37,13 @@ export const CSS = `
   max-width: 1040px;
   margin: 0 auto;
   padding: 26px 24px 40px;
+  /* The host's main column clips its content (overflow: hidden) instead of scrolling, so the panel
+     scrolls itself; without this a long queue is cut off and the apply bar is unreachable. */
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   color: var(--jl-ink);
   font-size: 14px;
   line-height: 1.55;
@@ -72,7 +79,7 @@ export const CSS = `
 .jl-root :focus-visible { outline: 2px solid var(--jl-accent); outline-offset: 2px; }
 
 /* ---- header ---- */
-.jl-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.jl-head { flex: none; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .jl-title { margin: 0; font-size: 19px; font-weight: 650; letter-spacing: -0.01em; }
 .jl-sub { margin: 2px 0 0; color: var(--jl-muted); font-size: 12px; }
 .jl-head-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -92,7 +99,7 @@ export const CSS = `
 .jl-tabs {
   display: inline-flex; gap: 2px; padding: 4px;
   background: var(--jl-surface-2); border: 1px solid var(--jl-line);
-  border-radius: 12px; align-self: flex-start; max-width: 100%; overflow-x: auto;
+  border-radius: 12px; align-self: flex-start; flex: none; max-width: 100%; overflow-x: auto;
 }
 .jl-tab {
   display: inline-flex; align-items: center; gap: 7px;
@@ -113,6 +120,12 @@ export const CSS = `
 
 /* ---- cards ---- */
 .jl-card { background: var(--jl-surface); border: 1px solid var(--jl-line); border-radius: var(--jl-radius); box-shadow: var(--jl-shadow); overflow: hidden; }
+/* A queue card fills the panel and scrolls only its rows, so the apply bar below the list stays put. */
+.jl-card.is-fill { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.jl-card.is-fill > .jl-card-head { flex: none; }
+.jl-card.is-fill > .jl-rows { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.jl-card.is-fill > .jl-empty { flex: 1 1 auto; overflow-y: auto; }
+.jl-card.is-fill > .jl-actions { flex: none; position: static; }
 .jl-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--jl-line); }
 .jl-card-title { margin: 0; font-size: 14px; font-weight: 600; }
 .jl-card-body { padding: 6px 0; }
