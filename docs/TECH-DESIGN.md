@@ -4,7 +4,7 @@
 |---|---|
 | 版本 | v0.1 |
 | 日期 | 2026-11-03 |
-| 对应 PRD | [PRD.md](./PRD.md) v0.5（34 项决策） |
+| 对应 PRD | [PRD.md](./PRD.md) v0.6（36 项决策） |
 | 读者 | 实现者（自己）、未来的协作者、评审 |
 | 范围 | 只覆盖 v0.1（仅 BOSS、单平台、双端） |
 
@@ -402,7 +402,7 @@ run.start(ids)
 
 ### 6.1 事件
 
-事件全集见 PRD §6。这里补三条实现约定：
+事件全集见 PRD §6。这里补几条实现约定：
 
 1. **每行必须自洽**：一条事件包含足够信息重建它影响的实体，不依赖"上一条"的隐含状态（便于未来并行重放）。
    `profile/set` 由面板「设置」写入，一条事件带完整的 `target` 三元组，重放后无需再读任何配置文件。
@@ -410,6 +410,8 @@ run.start(ids)
 3. **未知 `type` 跳过并计数**：向前兼容——旧版本读到新事件不崩，只丢该事件的影响。
 4. **`app/state` 的 `note` 与 `evidence` 进入投影**：面板要能直接显示"为什么 failed / uncertain"
    和证据路径，而不必回溯事件流。
+5. **`profile/set` 也可以带 `tracker.path`**（PRD §5.11）：它只影响投递表同步，不参与判重与投递决策；
+   没有这个字段时投递表视为未启用。
 
 ```jsonc
 { "v":1, "at":"2026-11-03T06:12:00.000Z", "type":"job/add",
@@ -763,10 +765,13 @@ export interface Api {
   'POST run/halt': { body: { runId: string; reason?: string }; response: RunView }
 
   'POST reconcile/run': { response: ReconcileView }
-  'POST profile': { body: { roles?: string[]; cities?: string[]; salaryMin?: number }
+  'POST profile': { body: { roles?: string[]; cities?: string[]; salaryMin?: number
+                            trackerPath?: string }
                     response: SettingsView }
   'POST queue/update': { body?: { source?: 'search'|'recommend' }; response: QueueUpdateView }
   'POST jobs/:id/skip': { response: { jobId: string; status: 'skipped' } }
+  'GET tracker': { response: TrackerView }
+  'POST tracker/sync': { response: TrackerSyncView }
   'POST reconcile/ack': { body: { jobIds: string[] }; response: { acknowledged: number } }
   'POST apps/:id/state': { body: { state: AppState; note?: string }; response: { appId: string; state: AppState } }
 }
@@ -798,6 +803,11 @@ interface RunView { runId?: string; state: 'idle'|'queued'|'running'|'paused'|'h
 interface SettingsView { revision: number
   target: { roles: string[]; cities: string[]; salaryMin: number }
   limits: { runSize: number; daily: number; salaryMinMax: number } }
+// 投递表（PRD §5.11）：路径来自 profile/set，headers 是读到的表头，对不上就 error
+interface TrackerView { revision: number; path: string; enabled: boolean
+  format: 'xlsx'|'numbers'|'unknown'; headers: string[]; lastSyncAt?: string
+  error?: { code: string; message: string } }
+interface TrackerSyncView { revision: number; added: number; updated: number; skipped: number }
 ```
 
 ### 11.3 并发与幂等
@@ -849,12 +859,15 @@ App
 ├─ <Queue/>       全选/反选、行内理由、行内「删除」、头部「更新」、粘底操作条（已选 N/10 + 投递）
 ├─ <Overview/>    5 个数字卡片 + 目标摘要 + 当前 run 状态条
 ├─ <Reconcile/>   两个列表 + "重新对账"
-└─ <Settings/>    目标岗位 / 城市（标签输入）+ 薪资下限 + 保存
+└─ <Settings/>    目标岗位 / 城市（标签输入）+ 薪资下限 + 投递表路径 + 保存
 ```
+
+**面板自己滚动**：宿主主栏（`.centerCol`）是 `overflow: hidden`，不会替插件滚动；面板根节点必须
+`height: 100%; overflow-y: auto` 才能看到超出视口的内容，待投卡片再把行区域设为唯一滚动区、把「投递」操作条固定在卡片底部。
 
 **设置屏的数据流**：`GET profile` 读投影里的目标 → 表单本地编辑 → `POST profile` 校验并追加一条
 `profile/set` → 响应即新目标。host 不缓存，工具在每次调用时读 `SettingsStore.profile`，所以保存后
-下一次 `job_ledger_discover` 就用新目标。
+下一次 `job_ledger_discover` 就用新目标。投递表路径走同一条事件（`tracker.path`），读取与写入见 §5.11。
 
 ### 12.3 状态映射
 

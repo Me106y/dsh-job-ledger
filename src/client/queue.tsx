@@ -142,7 +142,7 @@ export function Queue({ running, t }: ScreenProps): ReactElement {
   }
 
   return (
-    <div className="jl-card">
+    <div className="jl-card is-fill">
       <div className="jl-card-head">
         <h2 className="jl-card-title">
           {t('queueList')}
