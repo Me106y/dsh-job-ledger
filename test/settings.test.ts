@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { Ledger } from '../src/ledger/store.ts'
-import { SettingsStore, parseSettingsInput } from '../src/settings.ts'
+import { MAX_SALARY_MIN, SettingsStore, parseSettingsInput } from '../src/settings.ts'
 import { DEFAULT_PROFILE, mergeProfile } from '../src/shared/profile.ts'
 import type { Profile } from '../src/shared/profile.ts'
 import { PluginError } from '../src/shared/errors.ts'
@@ -41,33 +41,33 @@ function events(ledger: Ledger): { type: string; profile?: unknown }[] {
 
 test('without profile/set events the YAML target wins', (t) => {
   const base = mergeProfile(DEFAULT_PROFILE, {
-    target: { roles: ['后端开发'], cities: ['深圳'], salaryMin: 20 },
+    target: { roles: ['后端开发'], cities: ['深圳'], salaryMin: 20_000 },
   })
   const { settings } = fixture(t, base)
 
-  assert.deepEqual(settings.target, { roles: ['后端开发'], cities: ['深圳'], salaryMin: 20 })
+  assert.deepEqual(settings.target, { roles: ['后端开发'], cities: ['深圳'], salaryMin: 20_000 })
   assert.deepEqual(settings.profile.target.excludeKeywords, DEFAULT_PROFILE.target.excludeKeywords)
 })
 
 test('a panel save appends one profile/set event and applies immediately', (t) => {
   const { ledger, settings } = fixture(t)
 
-  settings.update({ roles: ['后端开发'], cities: ['上海'], salaryMin: 15 })
+  settings.update({ roles: ['后端开发'], cities: ['上海'], salaryMin: 15_000 })
 
   assert.deepEqual(settings.profile.target.roles, ['后端开发'])
-  assert.equal(settings.profile.target.salaryMin, 15)
+  assert.equal(settings.profile.target.salaryMin, 15_000)
   const written = events(ledger)
   assert.equal(written.length, 1)
   assert.equal(written[0]?.type, 'profile/set')
   assert.deepEqual(written[0]?.profile, {
-    target: { roles: ['后端开发'], cities: ['上海'], salaryMin: 15 },
+    target: { roles: ['后端开发'], cities: ['上海'], salaryMin: 15_000 },
   })
 })
 
 test('the target survives a replay, which is how a restart sees it', (t) => {
   const dir = tempDir(t)
   const first = Ledger.open(join(dir, 'events.jsonl'))
-  new SettingsStore(first).update({ roles: ['Java'], cities: ['杭州'], salaryMin: 12 })
+  new SettingsStore(first).update({ roles: ['Java'], cities: ['杭州'], salaryMin: 12_000 })
   first.close()
 
   const reopened = Ledger.open(join(dir, 'events.jsonl'))
@@ -77,7 +77,7 @@ test('the target survives a replay, which is how a restart sees it', (t) => {
   assert.deepEqual(new SettingsStore(reopened).target, {
     roles: ['Java'],
     cities: ['杭州'],
-    salaryMin: 12,
+    salaryMin: 12_000,
   })
 })
 
@@ -106,6 +106,12 @@ test('input is cleaned: trimmed, de-duplicated, blanks dropped', () => {
   })
 })
 
+test('a yuan salary floor is accepted unchanged, not read as thousands', () => {
+  assert.equal(MAX_SALARY_MIN, 999_999)
+  assert.deepEqual(parseSettingsInput({ salaryMin: 15_000 }), { salaryMin: 15_000 })
+  assert.deepEqual(parseSettingsInput({ salaryMin: 999_999 }), { salaryMin: 999_999 })
+})
+
 test('input beyond the bounds is refused', () => {
   const tooMany = Array.from({ length: 11 }, (_, index) => `岗位${String(index)}`)
   const tooLong = 'x'.repeat(31)
@@ -116,6 +122,7 @@ test('input beyond the bounds is refused', () => {
     { roles: [tooLong] },
     { salaryMin: -1 },
     { salaryMin: 1.5 },
+    { salaryMin: 1_000_000 },
     { salaryMin: '20' },
     { roles: 'not an array' },
     [],

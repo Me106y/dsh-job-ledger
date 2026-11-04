@@ -44,7 +44,10 @@ export function Overview({
   const target = settings?.target
   const roles = target === undefined || target.roles.length === 0 ? t('rolesFromResume') : target.roles.join('、')
   const cities = target === undefined || target.cities.length === 0 ? t('citiesUnlimited') : target.cities.join('、')
-  const salary = target === undefined || target.salaryMin === 0 ? '' : ` · ${String(target.salaryMin)}K+`
+  const salary =
+    target === undefined || target.salaryMin === 0
+      ? ''
+      : ` · ${t('salaryAtLeast', { value: target.salaryMin })}`
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

@@ -21,8 +21,8 @@ export const MAX_TERMS = 10
 /** Longest single role or city name. */
 export const MAX_TERM_CHARS = 30
 
-/** Salary floor ceiling, in thousands per month. */
-export const MAX_SALARY_MIN = 999
+/** Salary floor ceiling, in yuan per month. The floor shares `TargetRules.salaryMin`'s unit. */
+export const MAX_SALARY_MIN = 999_999
 
 /** The target fields the panel may change. */
 export interface TargetSettings {
