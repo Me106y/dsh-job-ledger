@@ -75,7 +75,7 @@ export async function discoverForModel(
 
   try {
     const reader = await provider.reader()
-    const discovered = await readJobList(reader, source, profile.target.roles)
+    const discovered = await readJobList(reader, source, profile.target.roles, profile.target.cities)
     const raw = discovered.jobs.slice(0, limit)
 
     const result = ingestJobs(ledger, raw, {

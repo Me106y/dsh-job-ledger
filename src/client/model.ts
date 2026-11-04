@@ -136,6 +136,7 @@ const REASON_KEYS: Readonly<Record<string, MessageKey>> = {
   'company-blacklist': 'reasonCompanyBlacklist',
   'excluded-keyword': 'reasonExcludedKeyword',
   'city-mismatch': 'reasonCityMismatch',
+  'job-type-mismatch': 'reasonJobType',
   'salary-below-floor': 'reasonSalaryFloor',
 }
 

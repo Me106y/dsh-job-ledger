@@ -30,6 +30,60 @@ export const BOSS_URLS = {
 } as const
 
 /**
+ * City name → the `city` code the search page uses in its URL.
+ *
+ * Verified for 北京 (101010100) against the live search page on 2026-11-04; the rest follow the same
+ * 101xxxxxx scheme and are marked unverified in TECH §20. An unknown city is not guessed: the search
+ * then keeps the site's own selection, exactly as before.
+ */
+export const CITY_CODES: Readonly<Record<string, string>> = {
+  北京: '101010100',
+  上海: '101020100',
+  广州: '101280100',
+  深圳: '101280600',
+  杭州: '101210100',
+  成都: '101270100',
+  南京: '101190100',
+  武汉: '101200100',
+  西安: '101110100',
+  苏州: '101190400',
+  长沙: '101250100',
+  重庆: '101040100',
+  天津: '101030100',
+  郑州: '101180100',
+  青岛: '101120200',
+  合肥: '101220100',
+  厦门: '101230200',
+  福州: '101230100',
+  济南: '101120100',
+  大连: '101070200',
+  无锡: '101190200',
+  东莞: '101281600',
+  佛山: '101280800',
+  宁波: '101210400',
+  珠海: '101280700',
+  昆明: '101290100',
+  南昌: '101240100',
+  贵阳: '101260100',
+  南宁: '101300100',
+  石家庄: '101090100',
+  太原: '101100100',
+  沈阳: '101070100',
+  长春: '101060100',
+  哈尔滨: '101050100',
+  兰州: '101160100',
+  乌鲁木齐: '101130100',
+  海口: '101310100',
+}
+
+/**
+ * @param city city name as the user wrote it @returns its search code, when known
+ */
+export function cityCode(city: string): string | undefined {
+  return CITY_CODES[city.trim()]
+}
+
+/**
  * Response patterns for the requests the page makes itself.
  *
  * Matching is on the path plus the `.json` suffix; query parameters are ignored, because the

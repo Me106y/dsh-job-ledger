@@ -9,7 +9,7 @@
  * @module dsh-job-ledger/discover/read
  */
 
-import { BOSS_API, BOSS_URLS, assertBossSuccess } from '../cdp/boss.ts'
+import { BOSS_API, BOSS_URLS, assertBossSuccess, cityCode } from '../cdp/boss.ts'
 import type { BrowserReader } from '../cdp/browser.ts'
 import { assertLoggedIn } from '../cdp/login.ts'
 import { parseJobList } from './parse.ts'
@@ -33,21 +33,26 @@ export interface DiscoveryResult {
  * Build the page URL for a source.
  *
  * Search needs a query; without a configured role the page's own default is used rather than
- * inventing a query the user never asked for.
+ * inventing a query the user never asked for. The first configured city with a known code is put
+ * into the URL, because the site otherwise keeps whatever city the browser last used — that is how
+ * every result ends up in one city.
  *
  * @param source search or recommendation
  * @param roles configured roles, first one used as the query
+ * @param cities configured cities, first known one drives the search area
  * @returns an absolute URL on the same origin
  */
 export function discoveryUrl(
   source: DiscoverySource,
   roles: readonly string[] = [],
+  cities: readonly string[] = [],
 ): string {
   if (source === 'recommend') return BOSS_URLS.search
-  const role = roles[0]
-  if (role === undefined) return BOSS_URLS.search
   const url = new URL(BOSS_URLS.search)
-  url.searchParams.set('query', role)
+  const role = roles[0]
+  if (role !== undefined) url.searchParams.set('query', role)
+  const code = cities.map(cityCode).find((entry) => entry !== undefined)
+  if (code !== undefined) url.searchParams.set('city', code)
   return url.toString()
 }
 
@@ -63,11 +68,12 @@ export async function readJobList(
   browser: BrowserReader,
   source: DiscoverySource,
   roles: readonly string[] = [],
+  cities: readonly string[] = [],
 ): Promise<DiscoveryResult> {
   const pattern = source === 'search' ? BOSS_API.searchList : BOSS_API.recommendList
   const pending = browser.capture(pattern)
 
-  await browser.navigate(discoveryUrl(source, roles))
+  await browser.navigate(discoveryUrl(source, roles, cities))
   await assertLoggedIn(browser, [pending])
 
   const payload = await pending

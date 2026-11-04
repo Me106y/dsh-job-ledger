@@ -45,7 +45,12 @@ test('without profile/set events the YAML target wins', (t) => {
   })
   const { settings } = fixture(t, base)
 
-  assert.deepEqual(settings.target, { roles: ['后端开发'], cities: ['深圳'], salaryMin: 20_000 })
+  assert.deepEqual(settings.target, {
+    roles: ['后端开发'],
+    cities: ['深圳'],
+    salaryMin: 20_000,
+    jobType: 'all',
+  })
   assert.deepEqual(settings.profile.target.excludeKeywords, DEFAULT_PROFILE.target.excludeKeywords)
 })
 
@@ -60,7 +65,7 @@ test('a panel save appends one profile/set event and applies immediately', (t) =
   assert.equal(written.length, 1)
   assert.equal(written[0]?.type, 'profile/set')
   assert.deepEqual(written[0]?.profile, {
-    target: { roles: ['后端开发'], cities: ['上海'], salaryMin: 15_000 },
+    target: { roles: ['后端开发'], cities: ['上海'], salaryMin: 15_000, jobType: 'all' },
   })
 })
 
@@ -78,6 +83,7 @@ test('the target survives a replay, which is how a restart sees it', (t) => {
     roles: ['Java'],
     cities: ['杭州'],
     salaryMin: 12_000,
+    jobType: 'all',
   })
 })
 
@@ -138,4 +144,15 @@ test('input beyond the bounds is refused', () => {
 
 test('unknown fields are ignored so an older host does not reject a newer client', () => {
   assert.deepEqual(parseSettingsInput({ roles: ['Java'], theme: 'dark' }), { roles: ['Java'] })
+})
+
+test('求职类型 is a target field that round-trips and rejects unknown values', (t) => {
+  const { ledger, settings } = fixture(t)
+
+  settings.update({ jobType: 'intern' })
+
+  assert.equal(settings.target.jobType, 'intern')
+  const written = events(ledger)[0] as { profile?: { target?: { jobType?: string } } }
+  assert.equal(written.profile?.target?.jobType, 'intern')
+  assert.throws(() => parseSettingsInput({ jobType: 'nope' }), { code: 'E_INVALID_ARGUMENT' })
 })

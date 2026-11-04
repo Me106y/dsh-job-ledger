@@ -199,6 +199,7 @@ export function settingsView(settings: SettingsStore, revision: number): Setting
       roles: [...target.roles],
       cities: [...target.cities],
       salaryMin: target.salaryMin,
+      jobType: target.jobType,
     },
     tracker: { path, format: trackerFormat(path) ?? 'none' },
     limits: { runSize: LIMITS.runSize, daily: LIMITS.daily, salaryMinMax: MAX_SALARY_MIN },

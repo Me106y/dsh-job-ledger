@@ -12,6 +12,8 @@
 import { existsSync } from 'node:fs'
 import { extname } from 'node:path'
 
+import { expandHome } from '../config.ts'
+
 import type { Application, Job } from '../ledger/events.ts'
 import { PluginError } from '../shared/errors.ts'
 import { readNumbers, upsertNumbers } from './numbers.ts'
@@ -40,19 +42,47 @@ export function trackerFormat(path: string): TrackerFormat | undefined {
   return undefined
 }
 
+/** What a configured path resolved to. */
+export interface ResolvedTrackerPath {
+  readonly path: string
+  readonly format: TrackerFormat
+}
+
 /**
- * Validate a configured path.
+ * Resolve the configured path to a file that exists.
  *
+ * People write the path they see in Finder, which hides extensions: 「投递进度表」 is enough. The
+ * direct path wins; otherwise `.xlsx` and `.numbers` are tried, and the resolved path is what gets
+ * stored. `~` is expanded.
+ *
+ * @param input the setting
+ * @returns the existing file and its format
+ * @throws PluginError `E_TRACKER_PATH` when nothing matches
+ */
+export function resolveTrackerPath(input: string): ResolvedTrackerPath {
+  const trimmed = input.trim()
+  if (trimmed === '') throw new PluginError('E_TRACKER_PATH', { what: '路径为空' })
+  const candidate = expandHome(trimmed)
+
+  const direct = trackerFormat(candidate)
+  if (direct !== undefined && existsSync(candidate)) return { path: candidate, format: direct }
+  for (const extension of ['.xlsx', '.numbers'] as const) {
+    const suffixed = `${candidate}${extension}`
+    if (existsSync(suffixed)) {
+      return { path: suffixed, format: extension === '.xlsx' ? 'xlsx' : 'numbers' }
+    }
+  }
+  if (existsSync(candidate)) throw new PluginError('E_TRACKER_PATH', { what: '只支持 .xlsx 或 .numbers' })
+  throw new PluginError('E_TRACKER_PATH', { what: '文件不存在，或不是 .xlsx / .numbers' })
+}
+
+/**
  * @param path the setting
- * @returns the format
- * @throws PluginError `E_TRACKER_PATH` when it is empty, unsupported or missing
+ * @returns the format of the file it names
+ * @throws PluginError `E_TRACKER_PATH` when it cannot be resolved
  */
 export function assertTrackerPath(path: string): TrackerFormat {
-  if (path.trim() === '') throw new PluginError('E_TRACKER_PATH', { what: '路径为空' })
-  const format = trackerFormat(path)
-  if (format === undefined) throw new PluginError('E_TRACKER_PATH', { what: '只支持 .xlsx 或 .numbers' })
-  if (!existsSync(path)) throw new PluginError('E_TRACKER_PATH', { what: '文件不存在' })
-  return format
+  return resolveTrackerPath(path).format
 }
 
 /**
@@ -63,9 +93,9 @@ export function assertTrackerPath(path: string): TrackerFormat {
  * @throws PluginError when the file cannot be read
  */
 export async function readTracker(path: string): Promise<SheetData> {
-  const format = assertTrackerPath(path)
+  const resolved = resolveTrackerPath(path)
   try {
-    return format === 'numbers' ? await readNumbers(path) : readSheet(path)
+    return resolved.format === 'numbers' ? await readNumbers(resolved.path) : readSheet(resolved.path)
   } catch (error) {
     if (error instanceof PluginError) throw error
     throw new PluginError('E_TRACKER_SHEET', { what: error instanceof Error ? error.message : String(error) })
@@ -110,7 +140,9 @@ export function alignWrite(write: SheetWrite, header: readonly string[]): SheetW
  * @returns how many rows were updated and appended
  * @throws PluginError when the sheet cannot be read or written
  */
-export async function writeTrackerRows(path: string, writes: readonly SheetWrite[]): Promise<TrackerWriteResult> {
+export async function writeTrackerRows(input: string, writes: readonly SheetWrite[]): Promise<TrackerWriteResult> {
+  const resolved = resolveTrackerPath(input)
+  const path = resolved.path
   const data = await readTracker(path)
 
   try {

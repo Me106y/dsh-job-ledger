@@ -22,7 +22,7 @@ import type { SettingsStore } from '../settings.ts'
 import { parseSettingsInput } from '../settings.ts'
 import { PluginError, userMessage } from '../shared/errors.ts'
 import { discoverForModel } from '../tools/discover.ts'
-import { assertTrackerPath, readTracker, trackerFormat } from '../tracker/sheet.ts'
+import { readTracker, resolveTrackerPath, trackerFormat } from '../tracker/sheet.ts'
 import { syncTracker } from '../tracker/sync.ts'
 import type { DiscoverySource } from '../discover/read.ts'
 import { reconcileForModel } from '../tools/reconcile.ts'
@@ -230,9 +230,12 @@ export function createApi(deps: ApiDeps): ApiHandlers {
       }
 
       if (route === 'POST profile') {
-        const input = parseSettingsInput(request.body)
+        let input = parseSettingsInput(request.body)
         // A path that does not exist (or is not a sheet) is rejected at save time, not after a run.
-        if (input.trackerPath !== undefined && input.trackerPath !== '') assertTrackerPath(input.trackerPath)
+        // Finder hides extensions, so 「投递进度表」 resolves to 投递进度表.numbers and that is stored.
+        if (input.trackerPath !== undefined && input.trackerPath !== '') {
+          input = { ...input, trackerPath: resolveTrackerPath(input.trackerPath).path }
+        }
         deps.settings.update(input, clock())
         return {
           status: 200,

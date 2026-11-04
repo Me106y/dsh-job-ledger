@@ -5,7 +5,14 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { Ledger } from '../../src/ledger/store.ts'
-import { alignWrite, readTracker, shortDate, trackerRow, writeTrackerRows } from '../../src/tracker/sheet.ts'
+import {
+  alignWrite,
+  readTracker,
+  resolveTrackerPath,
+  shortDate,
+  trackerRow,
+  writeTrackerRows,
+} from '../../src/tracker/sheet.ts'
 import { importSheetHistory, parseSheetDate, syncTracker } from '../../src/tracker/sync.ts'
 import { makeXlsx } from '../fixtures/xlsx.ts'
 import { makeApp, makeJob } from '../fixtures/helpers.ts'
@@ -97,4 +104,16 @@ test('a sheet write leaves rows it does not own untouched', async (t) => {
 
   assert.deepEqual(result, { updated: 1, appended: 0 })
   assert.equal((await readTracker(path)).rows[0]?.values[3], '已投')
+})
+
+test('a path without an extension resolves to the sheet that exists', async (t) => {
+  const { dir } = workspace(t)
+  const path = join(dir, '投递进度表.xlsx')
+  writeFileSync(path, makeXlsx(['公司', '岗位', 'Base地'], []))
+
+  const resolved = resolveTrackerPath(join(dir, '投递进度表'))
+
+  assert.equal(resolved.path, path)
+  assert.equal(resolved.format, 'xlsx')
+  assert.throws(() => resolveTrackerPath(join(dir, '不存在')), { code: 'E_TRACKER_PATH' })
 })

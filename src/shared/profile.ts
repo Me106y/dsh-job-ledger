@@ -28,6 +28,8 @@ export interface TargetRules {
   readonly cities: readonly string[]
   /** Salary floor in yuan/month. `0` disables the check. */
   readonly salaryMin: number
+  /** Which kind of posting the user is after (PRD §5.11 addendum). */
+  readonly jobType: 'all' | 'intern' | 'campus' | 'social'
   /** Title or JD keywords that disqualify a job. Silent drops are not allowed, so these are logged. */
   readonly excludeKeywords: readonly string[]
   /** Normalized company names that are never worth applying to. */
@@ -68,6 +70,7 @@ export const DEFAULT_PROFILE: Profile = {
     roles: [],
     cities: [],
     salaryMin: 0,
+    jobType: 'all',
     excludeKeywords: ['销售', '外包', '驻场', '培训', '中介', '保险'],
     companyBlacklist: [],
   },

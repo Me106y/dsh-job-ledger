@@ -67,3 +67,12 @@ test('a rate-limited list surfaces as E_RATE_LIMITED', async () => {
     return true
   })
 })
+
+test('search puts the first configured city with a known code into the URL', () => {
+  const url = discoveryUrl('search', ['后端工程师'], ['北京', '上海'])
+  assert.match(url, /city=101010100/)
+})
+
+test('an unknown city is not guessed, the site default stays', () => {
+  assert.ok(!discoveryUrl('search', ['后端'], ['不存在市']).includes('city='))
+})
