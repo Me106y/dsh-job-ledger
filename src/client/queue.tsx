@@ -8,14 +8,13 @@
  * @module dsh-job-ledger/client/queue
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ReactElement } from 'react'
 
 import type { QueueUpdateView, QueueView, RunView } from '../api/contract.ts'
 import { postApi, usePoll } from './api.ts'
 import type { ScreenProps } from './app.tsx'
 import {
-  REFILL_DEBOUNCE_MS,
   RUN_KEYS,
   pruneSelection,
   reasonKey,
@@ -47,7 +46,6 @@ export function Queue({ running, t }: ScreenProps): ReactElement {
   const [updating, setUpdating] = useState(false)
   const [deleting, setDeleting] = useState<string | undefined>(undefined)
   const [notice, setNotice] = useState<Notice | undefined>(undefined)
-  const refill = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   const current =
     view !== undefined && (updated === undefined || view.revision >= updated.revision)
@@ -65,13 +63,6 @@ export function Queue({ running, t }: ScreenProps): ReactElement {
       return next.size === previous.size ? previous : next
     })
   }, [current])
-
-  useEffect(
-    () => () => {
-      if (refill.current !== undefined) clearTimeout(refill.current)
-    },
-    [],
-  )
 
   const allSelected = rows.length > 0 && selected.size === rows.length
   const overLimit = selected.size > RUN_SIZE
@@ -132,13 +123,9 @@ export function Queue({ running, t }: ScreenProps): ReactElement {
       next.delete(jobId)
       return next
     })
+    // Deleting is a ledger edit, not a reason to reach the network: new postings arrive when the
+    // person presses 更新 (PRD §5.10 #34).
     setNotice({ text: t('deleted'), ok: true })
-    // Refill once after a burst of deletions: cleaning ten rows costs one discovery pass, not ten.
-    if (refill.current !== undefined) clearTimeout(refill.current)
-    refill.current = setTimeout(() => {
-      refill.current = undefined
-      void update()
-    }, REFILL_DEBOUNCE_MS)
   }
 
   return (

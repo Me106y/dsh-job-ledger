@@ -93,8 +93,6 @@ export function withoutRows(
   return removed.size === 0 ? [...rows] : rows.filter((row) => !removed.has(row.jobId))
 }
 
-/** How long deletions are coalesced before one refill discovery runs (PRD §5.10 #34). */
-export const REFILL_DEBOUNCE_MS = 800
 
 /**
  * @param view overview payload @returns the quota remainder, never negative

@@ -905,7 +905,7 @@ App
 - **更新**（`POST queue/update`）：按 `SettingsStore.profile` 调 `discoverForModel()`，返回计数 + 新清单；运行中禁用；
   失败显示结构化文案（`E_LOGIN_REQUIRED` 引导扫码），保留原清单；成功后头部展示"新增 N / 判重 N / 过滤 N / 疑似 N"；
 - **删除**（`POST jobs/:id/skip`）：写 `job/status = skipped`；行立即从本地清单消失（轮询未回来前也不闪回），
-  成功后自动触发一次「更新」补满；连续删除用短防抖合并成一次补满；运行中禁用；
+  删除只改账本，不触发抓取；补新岗位由用户点「更新」；运行中禁用；
   `applying` 之后（含 `uncertain`）的岗位 host 拒绝删除，返回 `E_ILLEGAL_TRANSITION`；
 - 点击后**不弹二次确认**（勾选本身就是确认），但 `halted` 后"继续"要确认（避免误触恢复风控中的账号）；
 - 疑似重复行有"看对比"入口：展开显示 `duplicateOf` 的目标岗位标题与相似度；
