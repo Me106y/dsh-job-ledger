@@ -151,32 +151,77 @@ export async function probeDebugPort(port: number): Promise<DebugTarget | undefi
  * @param fetchImpl injectable fetch, for tests
  * @returns the first page target, or undefined
  */
-export async function findPageTarget(
-  port: number,
-  fetchImpl: typeof fetch = fetch,
-): Promise<DebugTarget | undefined> {
+/** Pages the plugin may drive: its own blank tab, or a BOSS tab it opened earlier. */
+export function isPluginPage(url: string): boolean {
+  return url === 'about:blank' || /^https?:\/\/(?:[\w-]+\.)*zhipin\.com\//i.test(url)
+}
+
+/** @param port debug port @param fetchImpl injectable fetch @returns every page target */
+async function pageTargets(port: number, fetchImpl: typeof fetch): Promise<DebugTarget[]> {
   try {
     const response = await fetchImpl(`http://127.0.0.1:${String(port)}/json/list`, {
       signal: AbortSignal.timeout(2000),
     })
-    if (!response.ok) return undefined
+    if (!response.ok) return []
     const body = (await response.json()) as unknown
-    if (!Array.isArray(body)) return undefined
+    if (!Array.isArray(body)) return []
 
+    const pages: DebugTarget[] = []
     for (const entry of body) {
       if (typeof entry !== 'object' || entry === null) continue
       const target = entry as { type?: unknown; url?: unknown; webSocketDebuggerUrl?: unknown }
       if (target.type !== 'page') continue
       if (typeof target.webSocketDebuggerUrl !== 'string') continue
-      return {
+      pages.push({
         webSocketDebuggerUrl: target.webSocketDebuggerUrl,
         browser: typeof target.url === 'string' ? target.url : 'about:blank',
-      }
+      })
     }
-    return undefined
+    return pages
+  } catch {
+    return []
+  }
+}
+
+/** @param port debug port @param fetchImpl injectable fetch @returns a new blank tab, if Chrome made one */
+async function openPageTarget(port: number, fetchImpl: typeof fetch): Promise<DebugTarget | undefined> {
+  try {
+    const response = await fetchImpl(`http://127.0.0.1:${String(port)}/json/new?about:blank`, {
+      method: 'PUT',
+      signal: AbortSignal.timeout(2000),
+    })
+    if (!response.ok) return undefined
+    const body = (await response.json()) as { webSocketDebuggerUrl?: unknown; url?: unknown }
+    if (typeof body.webSocketDebuggerUrl !== 'string') return undefined
+    return {
+      webSocketDebuggerUrl: body.webSocketDebuggerUrl,
+      browser: typeof body.url === 'string' ? body.url : 'about:blank',
+    }
   } catch {
     return undefined
   }
+}
+
+/**
+ * Choose the page target to drive.
+ *
+ * Only a BOSS tab or a blank one is eligible: a debugged Chrome can hold the user's own tabs (the
+ * DSH panel itself lives at `127.0.0.1:3080`), and navigating one of those would replace the page
+ * they are using. When no plugin page exists, a new tab is opened instead of borrowing theirs.
+ *
+ * @param port debug port
+ * @param fetchImpl injectable fetch, for tests
+ * @returns the target to attach to, or undefined when Chrome offers none
+ */
+export async function findPageTarget(
+  port: number,
+  fetchImpl: typeof fetch = fetch,
+): Promise<DebugTarget | undefined> {
+  const pages = await pageTargets(port, fetchImpl)
+  const preferred = pages.find((page) => /zhipin\.com\//i.test(page.browser))
+    ?? pages.find((page) => page.browser === 'about:blank')
+  if (preferred !== undefined) return preferred
+  return openPageTarget(port, fetchImpl)
 }
 
 /**

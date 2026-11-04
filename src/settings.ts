@@ -32,6 +32,7 @@ export interface TargetSettings {
   readonly roles: readonly string[]
   readonly cities: readonly string[]
   readonly salaryMin: number
+  readonly jobType: 'all' | 'intern' | 'campus' | 'social'
 }
 
 /** A partial change: an omitted field keeps its current value; an empty array clears it. */
@@ -41,6 +42,8 @@ export interface SettingsInput {
   readonly salaryMin?: number | undefined
   /** Tracker sheet path (PRD §5.11); an empty string turns the feature off. */
   readonly trackerPath?: string | undefined
+  /** 不限 / 实习 / 校招 / 社招. */
+  readonly jobType?: 'all' | 'intern' | 'campus' | 'social' | undefined
 }
 
 /** Anything that can answer "what is the profile now?" — tools and the API both use it. */
@@ -94,7 +97,13 @@ export function parseSettingsInput(body: unknown): SettingsInput {
     throw new PluginError('E_INVALID_ARGUMENT', { what: 'body must be an object' })
   }
   const record = body as Record<string, unknown>
-  const input: { roles?: string[]; cities?: string[]; salaryMin?: number; trackerPath?: string } = {}
+  const input: {
+    roles?: string[]
+    cities?: string[]
+    salaryMin?: number
+    trackerPath?: string
+    jobType?: 'all' | 'intern' | 'campus' | 'social'
+  } = {}
 
   if (record['roles'] !== undefined) {
     if (!Array.isArray(record['roles'])) {
@@ -107,6 +116,13 @@ export function parseSettingsInput(body: unknown): SettingsInput {
       throw new PluginError('E_INVALID_ARGUMENT', { what: 'cities must be a list of strings' })
     }
     input.cities = cleanTerms(record['cities'], 'cities')
+  }
+  if (record['jobType'] !== undefined) {
+    const type = record['jobType']
+    if (type !== 'all' && type !== 'intern' && type !== 'campus' && type !== 'social') {
+      throw new PluginError('E_INVALID_ARGUMENT', { what: 'jobType must be all, intern, campus or social' })
+    }
+    input.jobType = type
   }
   if (record['trackerPath'] !== undefined) {
     const path = record['trackerPath']
@@ -151,7 +167,12 @@ export class SettingsStore implements ProfileSource {
   /** @returns the three fields the panel shows */
   get target(): TargetSettings {
     const target = this.profile.target
-    return { roles: target.roles, cities: target.cities, salaryMin: target.salaryMin }
+    return {
+      roles: target.roles,
+      cities: target.cities,
+      salaryMin: target.salaryMin,
+      jobType: target.jobType,
+    }
   }
 
   /**
@@ -170,6 +191,7 @@ export class SettingsStore implements ProfileSource {
       roles: input.roles ?? current.roles,
       cities: input.cities ?? current.cities,
       salaryMin: input.salaryMin ?? current.salaryMin,
+      jobType: input.jobType ?? current.jobType,
     }
     const tracker = input.trackerPath
     this.#ledger.append({

@@ -20,6 +20,7 @@ export type FilterReason =
   | 'excluded-keyword'
   | 'city-mismatch'
   | 'salary-below-floor'
+  | 'job-type-mismatch'
 
 /** The fields the filter needs. Kept structural so ingestion can pass a raw row. */
 export interface FilterInput {
@@ -55,6 +56,16 @@ export function hardFilter(input: FilterInput, profile: Profile): FilterHit | un
     if (needle !== '' && haystack.includes(needle)) {
       return { reason: 'excluded-keyword', detail: keyword }
     }
+  }
+
+  // 求职类型 is decided from the posting's own words: the platform's filter is a separate request
+  // we cannot set reliably yet, and guessing a URL parameter would silently search the wrong pool.
+  const wanted = profile.target.jobType
+  if (wanted !== 'all') {
+    const intern = /实习|intern/.test(haystack)
+    const campus = /校招|应届|校园|春招|秋招|管培/.test(haystack)
+    const matches = wanted === 'intern' ? intern : wanted === 'campus' ? campus : !intern && !campus
+    if (!matches) return { reason: 'job-type-mismatch', detail: wanted }
   }
 
   const cities = profile.target.cities.map(normalizeCity)

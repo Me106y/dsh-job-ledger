@@ -120,6 +120,9 @@ export const CSS = `
 
 /* ---- cards ---- */
 .jl-card { background: var(--jl-surface); border: 1px solid var(--jl-line); border-radius: var(--jl-radius); box-shadow: var(--jl-shadow); overflow: hidden; }
+/* Every other card keeps its natural height: as a flex item it would otherwise shrink and clip its
+   own content (settings is taller than the viewport), and the panel could not scroll to the rest. */
+.jl-card:not(.is-fill) { flex: none; }
 /* A queue card fills the panel and scrolls only its rows, so the apply bar below the list stays put. */
 .jl-card.is-fill { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .jl-card.is-fill > .jl-card-head { flex: none; }

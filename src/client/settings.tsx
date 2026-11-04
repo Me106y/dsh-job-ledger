@@ -106,6 +106,7 @@ export function Settings({
   const [cities, setCities] = useState<string[]>([])
   const [salary, setSalary] = useState('0')
   const [trackerPath, setTrackerPath] = useState('')
+  const [jobType, setJobType] = useState<'all' | 'intern' | 'campus' | 'social'>('all')
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | undefined>(undefined)
@@ -118,6 +119,7 @@ export function Settings({
     setCities([...view.target.cities])
     setSalary(String(view.target.salaryMin))
     setTrackerPath(view.tracker.path)
+    setJobType(view.target.jobType)
   }, [view])
 
   const touch = (): void => {
@@ -148,7 +150,7 @@ export function Settings({
     }
     setBusy(true)
     setError(undefined)
-    const result = await postApi<SettingsView>('profile', { roles, cities, salaryMin, trackerPath })
+    const result = await postApi<SettingsView>('profile', { roles, cities, salaryMin, jobType, trackerPath })
     setBusy(false)
     if (result.ok) {
       onSaved(result.value)
@@ -213,6 +215,26 @@ export function Settings({
             }}
           />
           <span className="jl-help">{t('salaryFloorHint')}</span>
+        </div>
+
+        <div className="jl-field">
+          <span className="jl-label">{t('jobType')}</span>
+          <span style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }}>
+            {(['all', 'intern', 'campus', 'social'] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                className={`jl-btn ${jobType === value ? 'is-primary' : ''}`}
+                onClick={() => {
+                  touch()
+                  setJobType(value)
+                }}
+              >
+                {t(value === 'all' ? 'jobTypeAll' : value === 'intern' ? 'jobTypeIntern' : value === 'campus' ? 'jobTypeCampus' : 'jobTypeSocial')}
+              </button>
+            ))}
+          </span>
+          <span className="jl-help">{t('jobTypeHint')}</span>
         </div>
 
         <div className="jl-field">

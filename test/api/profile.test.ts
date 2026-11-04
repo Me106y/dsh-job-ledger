@@ -65,10 +65,10 @@ test('GET profile reports the effective target and the hard limits', async (t) =
 
   assert.equal(result.status, 200)
   const body = result.body as {
-    target: { roles: string[]; cities: string[]; salaryMin: number }
+    target: { roles: string[]; cities: string[]; salaryMin: number; jobType: string }
     limits: { runSize: number; daily: number; salaryMinMax: number }
   }
-  assert.deepEqual(body.target, { roles: [], cities: [], salaryMin: 0 })
+  assert.deepEqual(body.target, { roles: [], cities: [], salaryMin: 0, jobType: 'all' })
   assert.deepEqual(body.limits, { runSize: 10, daily: 30, salaryMinMax: 999_999 })
 })
 
@@ -83,12 +83,13 @@ test('POST profile accepts a salary floor in yuan', async (t) => {
   })
   assert.equal(saved.status, 200)
   const savedBody = saved.body as {
-    target: { roles: string[]; cities: string[]; salaryMin: number }
+    target: { roles: string[]; cities: string[]; salaryMin: number; jobType: string }
   }
   assert.deepEqual(savedBody.target, {
     roles: ['后端开发'],
     cities: ['上海', '杭州'],
     salaryMin: 15_000,
+    jobType: 'all',
   })
 
   const read = await call({ method: 'GET', path: 'profile' })
@@ -118,7 +119,7 @@ test('an invalid target is a 400, not a partial save', async (t) => {
 
   assert.equal(result.status, 400)
   assert.equal((result.body as { code: string }).code, 'E_INVALID_ARGUMENT')
-  assert.deepEqual(fixtureValue.settings.target, { roles: [], cities: [], salaryMin: 0 })
+  assert.deepEqual(fixtureValue.settings.target, { roles: [], cities: [], salaryMin: 0, jobType: 'all' })
 })
 
 test('the profile route still requires the panel header', async (t) => {

@@ -111,6 +111,7 @@ export interface SettingsView {
     readonly roles: readonly string[]
     readonly cities: readonly string[]
     readonly salaryMin: number
+    readonly jobType: 'all' | 'intern' | 'campus' | 'social'
   }
   /**
    * Hard ceilings, shown for context; never writable. `salaryMinMax` is the bound the host accepts
@@ -166,6 +167,7 @@ export interface Api {
       roles?: readonly string[]
       cities?: readonly string[]
       salaryMin?: number
+      jobType?: 'all' | 'intern' | 'campus' | 'social'
       /** Tracker sheet path; an empty string turns the feature off. */
       trackerPath?: string
     }
