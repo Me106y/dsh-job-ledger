@@ -8,6 +8,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { createApi } from '../../src/api/handlers.ts'
+import { SettingsStore } from '../../src/settings.ts'
 import type { ApiHandlers } from '../../src/api/handlers.ts'
 import { MAX_BODY_BYTES, handleHttp, mountApi, routeRequestFrom } from '../../src/api/mount.ts'
 import { createRunTracker } from '../../src/api/views.ts'
@@ -40,6 +41,7 @@ function apiFor(t: { after(fn: () => void): void }): ApiHandlers {
     runner: { run: async () => DONE },
     provider,
     tracker: createRunTracker(),
+    settings: new SettingsStore(ledger),
     clock: () => NOW,
   })
 }

@@ -4,7 +4,7 @@
 |---|---|
 | 版本 | v0.1 |
 | 日期 | 2026-11-03 |
-| 对应 PRD | [PRD.md](./PRD.md) v0.3（28 项决策） |
+| 对应 PRD | [PRD.md](./PRD.md) v0.4（31 项决策） |
 | 读者 | 实现者（自己）、未来的协作者、评审 |
 | 范围 | 只覆盖 v0.1（仅 BOSS、单平台、双端） |
 
@@ -60,7 +60,7 @@
 浏览器侧：
   DSH Web 前端 → client bundle（同一个 npm 包，第二个入口）
                  ├─ sidebar.panellist → 图标
-                 └─ main             → 三屏面板（fetch /job-ledger/api/*）
+                 └─ main             → 四屏面板（fetch /job-ledger/api/*）
 ```
 
 **关键点**：panel 不直接碰 CDP，也不直接读文件。它只调 host-api，host-api 只调 service。这条单向依赖是后面所有并发安全的前提。
@@ -123,13 +123,14 @@ src/
 ├─ index.ts                 # host 插件入口：Config、依赖注入、装配
 ├─ config.ts                # schemastery 配置 schema
 ├─ skill.ts                 # 从 assets/job-ledger/SKILL.md 读入并注册
+├─ settings.ts              # 面板可改的目标（写 profile/set，读投影）
 ├─ tools/                   # 8 个 defineTool
 │  ├─ profile.ts resume.ts discover.ts queue.ts
 │  └─ apply.ts record.ts reconcile.ts report.ts
 ├─ api/
 │  ├─ contract.ts           # type-only：面板↔host 的 Api（不打包 host 代码）
 │  ├─ routes.ts             # ctx.webServer.register 路由表
-│  └─ views.ts              # 只读投影（QueueView/OverviewView/ReconcileView）
+│  └─ views.ts              # 只读投影（Queue/Overview/Reconcile/Settings）
 ├─ run/
 │  ├─ machine.ts            # run 状态机（纯函数，可单测）
 │  └─ executor.ts           # 串起 claim→cdp→record
@@ -150,8 +151,9 @@ src/
 ├─ client/
 │  ├─ index.tsx             # slot 注册
 │  ├─ api.ts                # caller + usePoll
-│  ├─ app.tsx               # 三屏容器
-│  ├─ queue.tsx overview.tsx reconcile.tsx
+│  ├─ app.tsx               # 四屏容器
+│  ├─ queue.tsx overview.tsx reconcile.tsx settings.tsx
+│  ├─ styles.ts             # 面板样式（注入一个 <style>）
 │  └─ locales.ts
 └─ shared/errors.ts         # 错误码（host 与 client 共用）
 assets/
@@ -402,6 +404,7 @@ run.start(ids)
 事件全集见 PRD §6。这里补三条实现约定：
 
 1. **每行必须自洽**：一条事件包含足够信息重建它影响的实体，不依赖"上一条"的隐含状态（便于未来并行重放）。
+   `profile/set` 由面板「设置」写入，一条事件带完整的 `target` 三元组，重放后无需再读任何配置文件。
 2. **`at` 由写入方给，不由读方补**：重放不得修改时间。
 3. **未知 `type` 跳过并计数**：向前兼容——旧版本读到新事件不崩，只丢该事件的影响。
 4. **`app/state` 的 `note` 与 `evidence` 进入投影**：面板要能直接显示"为什么 failed / uncertain"
@@ -751,6 +754,7 @@ export interface Api {
   'GET overview': { response: OverviewView }
   'GET reconcile': { response: ReconcileView }
   'GET run': { response: RunView }
+  'GET profile': { response: SettingsView }
 
   'POST run/start': { body: { ids: string[] }; response: RunView }
   'POST run/pause': { body: { runId: string }; response: RunView }
@@ -758,13 +762,15 @@ export interface Api {
   'POST run/halt': { body: { runId: string; reason?: string }; response: RunView }
 
   'POST reconcile/run': { response: ReconcileView }
+  'POST profile': { body: { roles?: string[]; cities?: string[]; salaryMin?: number }
+                    response: SettingsView }
   'POST reconcile/ack': { body: { jobIds: string[] }; response: { acknowledged: number } }
   'POST apps/:id/state': { body: { state: AppState; note?: string }; response: { appId: string; state: AppState } }
 }
 ```
 
-**P5 已实现**：`GET queue / overview / reconcile / run`、`POST run/start`、`POST reconcile/run`、
-`POST apps/:id/state`。`run/pause`、`run/resume`、`run/halt` **没有实现**——executor 还不能暂停一轮，
+**P5 已实现**：`GET queue / overview / reconcile / run / profile`、`POST run/start`、`POST reconcile/run`、
+`POST apps/:id/state`、`POST profile`。`run/pause`、`run/resume`、`run/halt` **没有实现**——executor 还不能暂停一轮，
 返回 409 会撒谎，所以先不提供；`reconcile/ack` 不落库，改由客户端本地记忆（差异列表本来就不持久化）。
 
 视图类型（只读投影，均为小对象）：
@@ -781,6 +787,9 @@ interface ReconcileView { revision: number
   platformOnly: { externalId: string; title: string; company: string }[] }
 interface RunView { runId?: string; state: 'idle'|'queued'|'running'|'paused'|'halted'|'done'
   total: number; done: number; current?: string; haltReason?: string; startedAt?: string }
+interface SettingsView { revision: number
+  target: { roles: string[]; cities: string[]; salaryMin: number }
+  limits: { runSize: number; daily: number } }
 ```
 
 ### 11.3 并发与幂等
@@ -821,15 +830,21 @@ export function apply(ctx) {
 }
 ```
 
-### 12.2 三屏结构
+### 12.2 四屏结构
 
 ```
 App
-├─ TabBar: 待投 | 概览 | 对账差异
-├─ <Queue/>     全选/反选、按 reason 过滤、投递按钮、行内理由展开
-├─ <Overview/>  5 个数字卡片（可点）+ 当前 run 状态条
-└─ <Reconcile/> 两个列表 + 批量补记 + "重新对账"
+├─ Header:   标题 + 运行状态 pill + 今日已投/额度
+├─ TabBar:   待投 | 概览 | 对账差异（带差异数 badge） | 设置
+├─ <Queue/>       全选/反选、行内理由、粘底操作条（已选 N/10 + 投递）
+├─ <Overview/>    5 个数字卡片 + 目标摘要 + 当前 run 状态条
+├─ <Reconcile/>   两个列表 + "重新对账"
+└─ <Settings/>    目标岗位 / 城市（标签输入）+ 薪资下限 + 保存
 ```
+
+**设置屏的数据流**：`GET profile` 读投影里的目标 → 表单本地编辑 → `POST profile` 校验并追加一条
+`profile/set` → 响应即新目标。host 不缓存，工具在每次调用时读 `SettingsStore.profile`，所以保存后
+下一次 `job_ledger_discover` 就用新目标。
 
 ### 12.3 状态映射
 
@@ -923,6 +938,10 @@ Skill 不是文档，是**约束**。每条约束都要有对应的工具侧校�
 ```
 
 > `limits` 出现在 schema 里是为了**只读展示**（面板显示额度），配置写入时忽略并 warn。
+
+**运行时可改的目标**：面板「设置」写的是 `profile/set` 事件（`target.roles` / `target.cities` /
+`target.salaryMin`），优先级高于这里的 YAML。`Ledger.open(file, config.profile)` 把 YAML 当作重放基底，
+事件在其上合并；面板从不改写 `cordis.patch.yml`。
 
 ---
 

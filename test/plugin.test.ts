@@ -10,14 +10,18 @@ import { makeApp, makeJob } from './fixtures/helpers.ts'
 import type { ToolDefinition } from '@deepseek-ai/dsh-tools'
 
 /**
- * A cordis context just real enough: a registry, a logger, and an effect collector.
+ * A cordis context just real enough: a registry, a logger, an effect collector, and `get`.
  *
  * This exercises the real `apply()` — the wiring that unit tests of individual modules cannot see,
- * and the part most likely to break when the harness changes.
+ * and the part most likely to break when the harness changes. The proxy mirrors cordis' rule that
+ * reading a service which is not in `inject` throws, so a direct `ctx.skills` / `ctx.webServer`
+ * access fails here instead of only on a real host.
  */
 interface FakeContext {
   readonly tools: { register(definition: ToolDefinition): () => void }
   readonly logger: { info(message: string): void; warn(message: string): void }
+  get(name: string): undefined
+  inject(dependencies: readonly string[], callback: (ctx: FakeContext) => void): void
   effect(effect: () => () => void): void
 }
 
@@ -29,7 +33,7 @@ function context(): {
 } {
   const registered: ToolDefinition[] = []
   const disposers: (() => void)[] = []
-  const ctx: FakeContext = {
+  const base: FakeContext = {
     tools: {
       register(definition: ToolDefinition): () => void {
         registered.push(definition)
@@ -37,11 +41,24 @@ function context(): {
       },
     },
     logger: { info: () => undefined, warn: () => undefined },
+    get: () => undefined,
+    // No skills or web server on this fake host, so an optional callback runs and finds nothing.
+    inject(_dependencies, callback): void {
+      callback(base)
+    },
     effect(effect: () => () => void): void {
       const disposer = effect()
       disposers.push(disposer)
     },
   }
+  const ctx = new Proxy(base, {
+    get(target, property, receiver) {
+      if (typeof property === 'symbol' || property in target) {
+        return Reflect.get(target, property, receiver) as unknown
+      }
+      throw new Error(`cannot get property "${String(property)}" without inject`)
+    },
+  })
   return {
     ctx,
     registered,

@@ -86,6 +86,18 @@ export interface ApiError {
   readonly values?: Readonly<Record<string, string>>
 }
 
+/** The target the settings screen shows and edits (PRD §5.10). */
+export interface SettingsView {
+  readonly revision: number
+  readonly target: {
+    readonly roles: readonly string[]
+    readonly cities: readonly string[]
+    readonly salaryMin: number
+  }
+  /** Hard ceilings, shown for context; never writable. */
+  readonly limits: { readonly runSize: number; readonly daily: number }
+}
+
 /**
  * The routes. Path parameters use `:name`.
  *
@@ -99,9 +111,14 @@ export interface Api {
   'GET overview': { response: OverviewView }
   'GET reconcile': { response: ReconcileView }
   'GET run': { response: RunView }
+  'GET profile': { response: SettingsView }
 
   'POST run/start': { body: { ids: string[] }; response: RunView }
   'POST reconcile/run': { response: ReconcileView }
+  'POST profile': {
+    body: { roles?: readonly string[]; cities?: readonly string[]; salaryMin?: number }
+    response: SettingsView
+  }
   'POST apps/:id/state': {
     body: { state: AppState; note?: string }
     response: { appId: string; state: AppState }

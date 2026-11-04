@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { createApi } from '../../src/api/handlers.ts'
+import { SettingsStore } from '../../src/settings.ts'
 import type { RouteRequest, RouteResult } from '../../src/api/handlers.ts'
 import { createRunTracker } from '../../src/api/views.ts'
 import type { RunStarter } from '../../src/tools/apply.ts'
@@ -67,6 +68,7 @@ function apiFor(
     runner: run,
     provider: provider(browser),
     tracker: createRunTracker(),
+    settings: new SettingsStore(ledger),
     clock: () => NOW,
   })
   return (request: RouteRequest): Promise<RouteResult> =>
@@ -80,6 +82,7 @@ test('a request without the panel header is refused', async (t) => {
     runner: starter(DONE).starter,
     provider: provider(new ReplayBrowser({ deliver })),
     tracker: createRunTracker(),
+    settings: new SettingsStore(ledger),
     clock: () => NOW,
   })
 

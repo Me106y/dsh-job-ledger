@@ -17,6 +17,7 @@ import type { ConfigInput } from './config.ts'
 import { createApplier } from './cdp/applier.ts'
 import type { Job } from './ledger/events.ts'
 import { JobRunner } from './run/executor.ts'
+import { SettingsStore } from './settings.ts'
 import { fillGreeting } from './resume/greeting.ts'
 import { loadSkillBody, registerSkill } from './skill.ts'
 import { weeklySnapshot } from './report/snapshot.ts'
@@ -240,7 +241,10 @@ export const inject: readonly string[] = ['tools']
  */
 export function apply(ctx: Context, config: ConfigInput = {}): void {
   const resolved = resolveConfig(config)
-  const ledger = Ledger.open(join(resolved.dataDir, 'events.jsonl'))
+  // The YAML profile is the base; `profile/set` events (the panel's saves) merge on top of it.
+  const ledger = Ledger.open(join(resolved.dataDir, 'events.jsonl'), resolved.profile)
+  // Tools and the API read the live profile, because the panel can change the target after mount.
+  const settings = new SettingsStore(ledger)
   const runtime = new BrowserRuntime(resolved)
 
   const greeting = createGreeting(runtime)
@@ -253,25 +257,36 @@ export function apply(ctx: Context, config: ConfigInput = {}): void {
   })
 
   registerResumeTool(ctx, runtime, resolved)
-  registerDiscoverTool(ctx, ledger, runtime, resolved)
+  registerDiscoverTool(ctx, ledger, runtime, resolved, settings)
   registerQueueTool(ctx, ledger)
   registerApplyTool(ctx, runner)
   registerReconcileTool(ctx, ledger, runtime)
   registerReportTool(ctx, ledger, resolved.dataDir)
-  registerProfileTool(ctx, resolved)
+  registerProfileTool(ctx, resolved, settings)
   registerLoginTool(ctx, runtime)
   registerBackfillTool(ctx, ledger, runtime)
   registerRecordTool(ctx, ledger)
 
   const skill = loadSkillBody()
-  if (skill !== undefined) registerSkill(ctx, skill)
+  if (skill !== undefined) {
+    // The skill registry may be provided by a sibling entry; wait for it instead of sampling the
+    // context at mount time. A host without one simply never runs the callback.
+    ctx.inject(['skills'], (injected) => {
+      registerSkill(injected, skill)
+    })
+  }
 
   // The panel API is optional: a profile without a web server (headless) still gets the tools.
-  const webServer = (ctx as unknown as { webServer?: WebServerLike }).webServer
-  if (webServer !== undefined) {
+  // `inject` (not a mount-time property read) is what makes "optional" safe: the web server can
+  // be provided by an entry that activates after this one, and reading `ctx.webServer` directly
+  // would either throw (not in `inject`) or see `undefined` (not active yet).
+  ctx.inject(['webServer'], (injected) => {
+    const webServer = injected.get('webServer') as WebServerLike | undefined
+    if (webServer === undefined) return
     const tracker = createRunTracker()
-    mountApi(webServer, createApi({ ledger, runner, provider: runtime, tracker }))
-  }
+    const api = createApi({ ledger, runner, provider: runtime, tracker, settings })
+    injected.effect(() => mountApi(webServer, api))
+  })
 
   // A process that died mid-application left `applying` behind, which does not block a retry.
   recoverInterrupted(ledger)

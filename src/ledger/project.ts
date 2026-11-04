@@ -130,9 +130,9 @@ export function companyTitleKey(companyNorm: string, titleNorm: string): string 
 }
 
 /** @returns an empty projection with the default profile */
-export function createProjection(): Projection {
+export function createProjection(profile: Profile = DEFAULT_PROFILE): Projection {
   return {
-    profile: DEFAULT_PROFILE,
+    profile,
     jobs: new Map(),
     apps: new Map(),
     leases: new Map(),

@@ -10,7 +10,10 @@ import type { ReactElement } from 'react'
 import type { QueueView, RunView } from '../api/contract.ts'
 import { postApi, usePoll } from './api.ts'
 import type { ScreenProps } from './app.tsx'
-import { pruneSelection, rowSubtitle, toggleSelection } from './model.ts'
+import { RUN_KEYS, pruneSelection, reasonKey, toggleSelection } from './model.ts'
+
+/** One run never exceeds this; the host refuses more (PRD §5.5). */
+const RUN_SIZE = 10
 
 /**
  * @param props run flag and translator
@@ -20,65 +23,139 @@ export function Queue({ running, t }: ScreenProps): ReactElement {
   const view = usePoll<QueueView>('queue?filter=new', running)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState(false)
-  const [notice, setNotice] = useState<string | undefined>(undefined)
+  const [notice, setNotice] = useState<{ readonly text: string; readonly ok: boolean } | undefined>(
+    undefined,
+  )
 
   useEffect(() => {
     if (view !== undefined) setSelected((previous) => pruneSelection(view.rows, previous))
   }, [view])
 
   const rows = view?.rows ?? []
+  const allSelected = rows.length > 0 && selected.size === rows.length
+  const overLimit = selected.size > RUN_SIZE
 
   const apply = async (): Promise<void> => {
     setBusy(true)
+    setNotice(undefined)
     const result = await postApi<RunView>('run/start', { ids: [...selected] })
     setBusy(false)
-    setNotice(result.ok ? result.value.state : result.failure.error)
-    if (result.ok) setSelected(new Set())
+    if (result.ok) {
+      const run = result.value
+      setNotice({ text: `${t(RUN_KEYS[run.state])} ${String(run.done)}/${String(run.total)}`, ok: true })
+      setSelected(new Set())
+    } else {
+      setNotice({ text: result.failure.error, ok: false })
+    }
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {rows.length === 0 ? <p style={{ opacity: 0.7 }}>{t('emptyQueue')}</p> : null}
+    <div className="jl-card">
+      <div className="jl-card-head">
+        <h2 className="jl-card-title">
+          {t('queueList')}
+          {rows.length > 0 ? (
+            <span className="jl-badge" style={{ marginLeft: 8 }}>
+              {String(rows.length)}
+            </span>
+          ) : null}
+        </h2>
+        <label className="jl-pill" style={{ cursor: rows.length === 0 ? 'default' : 'pointer' }}>
+          <input
+            type="checkbox"
+            className="jl-check"
+            checked={allSelected}
+            disabled={rows.length === 0}
+            aria-label={t('selectAll')}
+            onChange={() => {
+              setSelected(allSelected ? new Set() : new Set(rows.map((row) => row.jobId)))
+            }}
+          />
+          {t('selectAll')}
+        </label>
+      </div>
 
-      <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 6 }}>
-        {rows.map((row) => (
-          <li
-            key={row.jobId}
-            style={{
-              display: 'flex',
-              gap: 8,
-              alignItems: 'baseline',
-              padding: '8px 10px',
-              border: '1px solid var(--dsh-border, #e2e2e2)',
-              borderRadius: 6,
+      {view === undefined ? (
+        <p className="jl-loading">{t('loading')}</p>
+      ) : rows.length === 0 ? (
+        <div className="jl-empty">
+          <strong>{t('emptyQueue')}</strong>
+          <span>{t('emptyQueueHint')}</span>
+        </div>
+      ) : (
+        <ul className="jl-rows">
+          {rows.map((row) => {
+            const key = reasonKey(row.reason)
+            return (
+            <li key={row.jobId} className="jl-row">
+              <input
+                type="checkbox"
+                className="jl-check"
+                checked={selected.has(row.jobId)}
+                aria-label={row.title}
+                onChange={() => {
+                  setSelected((previous) => toggleSelection(previous, row.jobId))
+                }}
+              />
+              <div>
+                <div className="jl-row-title">{row.title}</div>
+                <div className="jl-row-meta">
+                  <span>{row.company}</span>
+                  {row.city === '' ? null : (
+                    <>
+                      <span className="jl-sep">·</span>
+                      <span>{row.city}</span>
+                    </>
+                  )}
+                  {row.salary === '' ? null : (
+                    <>
+                      <span className="jl-sep">·</span>
+                      <span>{row.salary}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+              <span
+                className={`jl-tag ${row.decision === 'suspect' ? 'is-suspect' : 'is-new'}`}
+                title={row.reason}
+              >
+                {key === undefined ? row.reason : t(key)}
+              </span>
+            </li>
+            )
+          })}
+        </ul>
+      )}
+
+      <div className="jl-actions">
+        <span className="jl-actions-note">
+          {t('selected')} {String(selected.size)}/{String(RUN_SIZE)}
+          {notice === undefined ? null : (
+            <span className={notice.ok ? 'jl-saved' : 'jl-error'} style={{ marginLeft: 10 }}>
+              {notice.text}
+            </span>
+          )}
+        </span>
+        <span style={{ display: 'inline-flex', gap: 8 }}>
+          <button
+            type="button"
+            className="jl-btn is-ghost"
+            disabled={busy || selected.size === 0}
+            onClick={() => {
+              setSelected(new Set())
             }}
           >
-            <input
-              type="checkbox"
-              checked={selected.has(row.jobId)}
-              onChange={() => {
-                setSelected((previous) => toggleSelection(previous, row.jobId))
-              }}
-            />
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <strong>{row.title}</strong>
-              <span style={{ opacity: 0.7, fontSize: 12 }}>
-                {rowSubtitle(row)} · {row.reason}
-              </span>
-            </div>
-          </li>
-        ))}
-      </ul>
-
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <button
-          type="button"
-          disabled={busy || selected.size === 0}
-          onClick={() => void apply()}
-        >
-          {busy ? t('applying') : `${t('apply')} ${String(selected.size)}`}
-        </button>
-        {notice !== undefined ? <span style={{ opacity: 0.7 }}>{notice}</span> : null}
+            {t('clear')}
+          </button>
+          <button
+            type="button"
+            className="jl-btn is-primary"
+            disabled={busy || selected.size === 0 || overLimit}
+            onClick={() => void apply()}
+          >
+            {busy ? t('applying') : `${t('apply')} ${String(selected.size)}`}
+          </button>
+        </span>
       </div>
     </div>
   )

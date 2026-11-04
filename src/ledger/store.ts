@@ -35,6 +35,7 @@ import type { EventInput, LedgerEvent } from './events.ts'
 import { applyEvent, createProjection } from './project.ts'
 import type { Projection } from './project.ts'
 import { PluginError } from '../shared/errors.ts'
+import type { Profile } from '../shared/profile.ts'
 
 /** Hard cap on one line, so a runaway JD cannot make the log unreadable (TECH §6.2). */
 export const MAX_LINE_BYTES = 64 * 1024
@@ -65,11 +66,12 @@ export interface ReplayResult {
  * tested without touching a disk.
  *
  * @param raw file contents (empty buffer for a new ledger)
+ * @param base profile from configuration, before any `profile/set` events are applied
  * @returns the rebuilt projection and where the readable prefix ends
  * @throws PluginError `E_LEDGER_VERSION` when the log was written by a newer schema
  */
-export function replay(raw: Buffer): ReplayResult {
-  const projection = createProjection()
+export function replay(raw: Buffer, base?: Profile): ReplayResult {
+  const projection = createProjection(base)
   let validBytes = 0
   let appliedLines = 0
   let unknownTypes = 0
@@ -228,10 +230,11 @@ export class Ledger {
    * records that it happened instead of hiding it.
    *
    * @param file path to `events.jsonl`
+   * @param base profile from configuration; `profile/set` events are merged on top of it
    * @returns the open ledger
    * @throws PluginError `E_LEDGER_VERSION` for a newer schema, `E_LEDGER_WRITE` on I/O failure
    */
-  static open(file: string): Ledger {
+  static open(file: string, base?: Profile): Ledger {
     try {
       mkdirSync(dirname(file), { recursive: true })
     } catch (error) {
@@ -245,7 +248,7 @@ export class Ledger {
       throw new PluginError('E_LEDGER_WRITE', { what: String(error) })
     }
 
-    const result = replay(raw)
+    const result = replay(raw, base)
 
     let fd: number
     try {

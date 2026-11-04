@@ -14,6 +14,7 @@ import type { ReactElement } from 'react'
 import { App } from './app.tsx'
 import { LedgerIcon } from './icon.tsx'
 import { NS, messages } from './locales.ts'
+import { installStyles } from './styles.ts'
 import type { MessageKey } from './locales.ts'
 
 /** The slice of `ctx.slots` this plugin uses. */
@@ -53,6 +54,9 @@ export function apply(ctx: ClientContext): void {
     ctx.locale.register(NS, messages)
     return () => undefined
   })
+
+  // One stylesheet for every screen; removed with the plugin.
+  ctx.effect(() => installStyles())
 
   ctx.slots.inject('main', () => {
     ctx.slots.register({ name: 'main', key: 'dsh-job-ledger', locale: NS }, () => <App t={t} />)

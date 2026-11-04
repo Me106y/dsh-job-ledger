@@ -64,14 +64,22 @@ export function skillRegistration(content: string): SkillRegistration {
   }
 }
 
+/** The slice of the host skill registry this module uses. */
+export interface SkillRegistry {
+  register(skill: SkillRegistration): () => void
+}
+
 /**
  * Register the skill when the host has a skill registry.
+ *
+ * The registry is read with `ctx.get` rather than `ctx.skills`: cordis rejects property access to a
+ * service that is not in `inject`, which would fail the whole plugin on a headless host. `get`
+ * answers "is it there?" without making it a requirement.
  *
  * @param ctx host context @param content body to register @returns the disposer, or undefined
  */
 export function registerSkill(ctx: Context, content: string): (() => void) | undefined {
-  const skills = (ctx as unknown as { skills?: { register(skill: SkillRegistration): () => void } })
-    .skills
+  const skills = ctx.get('skills') as SkillRegistry | undefined
   if (skills === undefined) return undefined
   return skills.register(skillRegistration(content))
 }
