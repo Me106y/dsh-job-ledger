@@ -5,7 +5,6 @@ import type { OverviewView, QueueRowView, RunView } from '../../src/api/contract
 import {
   POLL_ACTIVE_MS,
   POLL_IDLE_MS,
-  REFILL_DEBOUNCE_MS,
   isStale,
   pollInterval,
   pruneSelection,
@@ -90,5 +89,4 @@ test('deleted rows stay hidden until a payload catches up', () => {
   assert.deepEqual(withoutRows(rows, new Set(['j_1'])).map((entry) => entry.jobId), ['j_2'])
   // An id the payload never had changes nothing.
   assert.deepEqual(withoutRows(rows, new Set(['j_x'])).map((entry) => entry.jobId), ['j_1', 'j_2'])
-  assert.ok(REFILL_DEBOUNCE_MS > 0)
 })
