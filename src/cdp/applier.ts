@@ -27,12 +27,17 @@ export interface ApplierTimings {
   readonly greetTimeoutMs?: number
   readonly cardTimeoutMs?: number
   readonly resumeButtonTimeoutMs?: number
+  /** How long the contact button gets to turn into 继续沟通 before a retry. */
+  readonly contactSettleMs?: number
 }
 
 const DEFAULT_SEND_TIMEOUT_MS = 15_000
 const DEFAULT_GREET_TIMEOUT_MS = 5_000
 const DEFAULT_CARD_TIMEOUT_MS = 2_000
 const DEFAULT_RESUME_BUTTON_TIMEOUT_MS = 800
+
+/** How long the contact button gets to turn into 继续沟通 before the click is retried. */
+const CONTACT_SETTLE_MS = 1_200
 
 /** Sends one application through a real page. */
 export class BossApplier implements JobApplier {
@@ -51,6 +56,7 @@ export class BossApplier implements JobApplier {
       cardTimeoutMs: timings.cardTimeoutMs ?? DEFAULT_CARD_TIMEOUT_MS,
       resumeButtonTimeoutMs:
         timings.resumeButtonTimeoutMs ?? DEFAULT_RESUME_BUTTON_TIMEOUT_MS,
+      contactSettleMs: timings.contactSettleMs ?? CONTACT_SETTLE_MS,
     }
   }
 
@@ -77,6 +83,14 @@ export class BossApplier implements JobApplier {
     const network = this.#watchSendResponse()
 
     await this.#port.click(BOSS_SELECTORS.contactButton)
+    // The button turns into 继续沟通 the moment the platform accepted the contact. If it still says
+    // 立即沟通 a moment later, the SPA had not bound its handler yet and the click was swallowed —
+    // one more click is safe: the second one lands on an already-created conversation at worst.
+    await new Promise<void>((resolve) => setTimeout(resolve, this.#timings.contactSettleMs))
+    if ((await this.#port.text(BOSS_SELECTORS.contactButton)).includes('立即沟通')) {
+      await this.#port.click(BOSS_SELECTORS.contactButton)
+      await new Promise<void>((resolve) => setTimeout(resolve, this.#timings.contactSettleMs))
+    }
 
     // 立即沟通 sends the platform's own greeting and *then* opens the chat. Typing our greeting on
     // that page would send a second message to the same recruiter, so the typing step only runs

@@ -23,6 +23,8 @@ interface PortOptions {
   readonly redirectTo?: string
   /** Where the contact click lands; BOSS sends its own greeting and jumps to the chat. */
   readonly clickNavigatesTo?: string
+  /** Contact-button labels returned per `text()` call; the last one repeats. */
+  readonly contactLabels?: readonly string[]
   readonly chat?: string
 }
 
@@ -36,6 +38,8 @@ class FakePort implements BrowserPort {
   #chat: string
   #redirectTo: string | undefined
   #clickNavigatesTo: string | undefined
+  #contactLabels: readonly string[]
+  #labelReads = 0
 
   constructor(options: PortOptions = {}) {
     this.#present = new Set(options.present ?? [])
@@ -43,6 +47,7 @@ class FakePort implements BrowserPort {
     this.#chat = options.chat ?? '你好，我想投递这个岗位'
     this.#redirectTo = options.redirectTo
     this.#clickNavigatesTo = options.clickNavigatesTo
+    this.#contactLabels = options.contactLabels ?? ['继续沟通']
     if (options.currentUrl !== undefined) this.url = options.currentUrl
   }
 
@@ -72,7 +77,13 @@ class FakePort implements BrowserPort {
     return this.#present.has(selector)
   }
 
-  async text(): Promise<string> {
+  async text(selector: string): Promise<string> {
+    if (selector === BOSS_SELECTORS.contactButton) {
+      const labels = this.#contactLabels
+      const label = labels[Math.min(this.#labelReads, labels.length - 1)] ?? ''
+      this.#labelReads += 1
+      return label
+    }
     return this.#chat
   }
 
@@ -214,4 +225,28 @@ test('when 立即沟通 already opened the chat, no second greeting is typed', a
   // BOSS sent its own default greeting with the click; typing here would message the same HR twice.
   assert.ok(!port.calls.some((call) => call.startsWith('type:')), port.calls.join(', '))
   assert.ok(!port.calls.includes(`click:${BOSS_SELECTORS.sendButton}`), port.calls.join(', '))
+})
+
+/** @param options port options @returns an applier whose contact settle is instant in tests */
+function fastApplier(options: PortOptions = {}): { applier: BossApplier; port: FakePort } {
+  const port = readyPort(options)
+  return { port, applier: new BossApplier(port, { contactSettleMs: 0 }) }
+}
+
+test('a click the page ignored is retried once, so a swallowed click is not a failed attempt', async () => {
+  const { applier, port } = fastApplier({ contactLabels: ['立即沟通', '继续沟通'] })
+
+  await applier.send(JOB, '你好')
+
+  const clicks = port.calls.filter((call) => call === `click:${BOSS_SELECTORS.contactButton}`)
+  assert.equal(clicks.length, 2)
+})
+
+test('a contact that already turned into 继续沟通 is clicked once', async () => {
+  const { applier, port } = fastApplier({ contactLabels: ['继续沟通'] })
+
+  await applier.send(JOB, '你好')
+
+  const clicks = port.calls.filter((call) => call === `click:${BOSS_SELECTORS.contactButton}`)
+  assert.equal(clicks.length, 1)
 })
