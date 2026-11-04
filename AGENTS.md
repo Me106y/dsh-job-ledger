@@ -1,7 +1,7 @@
 # AGENTS.md
 
 > 给 Agent 的项目指令。只放两类内容：**项目全貌** + **违反就会出错的硬规则**；细节一律链到 `docs/`。
-> 真理源：产品看 `docs/PRD.md`（v0.3，28 项决策已锁定），实现看 `docs/TECH-DESIGN.md`（v0.1）。
+> 真理源：产品看 `docs/PRD.md`（v0.4，31 项决策已锁定），实现看 `docs/TECH-DESIGN.md`（v0.1）。
 > 本文与 docs 冲突时以 docs 为准，并在同一个 PR 里修正本文。
 
 ## 项目概述
@@ -9,7 +9,7 @@
 `dsh-job-ledger` 是 DeepSeek Harness 的**本地求职投递账本**：判重、冷却、证据链、与 BOSS 对账。
 它记录你投过什么、投成了什么；投不投由你决定。
 
-- **形态**：DSH cordis 插件。同一个 npm 包两个入口——host（工具 + 投递执行）与 Web 面板（三屏，只走 host API）。
+- **形态**：DSH cordis 插件。同一个 npm 包两个入口——host（工具 + 投递执行）与 Web 面板（四屏：待投 / 概览 / 对账 / 设置，只走 host API）。
 - **技术栈**：TypeScript（ESM / strict）· Node 22 或 24 的内置能力（`child_process` 起 Chrome、原生 `fetch`、原生 `WebSocket` 说 CDP）· `node:test` · tsdown · pnpm。
 - **数据**：`$DSH_HOME/job-ledger/` 下的 `events.jsonl`（只追加），不出本机。
 
@@ -110,7 +110,7 @@ client ──只允许──► api/contract.ts（type-only）+ shared/errors.ts
 
 ### 范围：这些是明确不做的
 
-PRD §3.2 已把多平台、简历改写、自由生成招呼语、上传 PDF、云端同步、面板图表/设置页/证据页、自动回复 HR 划为非目标。**不要顺手实现**——它们被评估过并主动推迟；有疑问先开 issue。
+PRD §3.2 已把多平台、简历改写、自由生成招呼语、上传 PDF、云端同步、面板图表/证据页、自动回复 HR 划为非目标。**不要顺手实现**——它们被评估过并主动推迟；有疑问先开 issue。
 
 ## 提交与 PR：`main` 只接受 PR
 
@@ -124,7 +124,7 @@ PRD §3.2 已把多平台、简历改写、自由生成招呼语、上传 PDF、
 - **agent 提的 PR，第一行写 `This is by an automated agent, not a human.`**，让人一眼分得清谁写的。
 - **CI 必须绿**：`typecheck · test · build` 外加一条 tarball 内容断言；本地等价命令是 `pnpm check`。不绕过、不跳过。
 - **合并用 merge commit**（保留分支上的提交），不 squash，也不 rebase 掉历史。
-- **改产品决策**：先改 `docs/PRD.md` §15 决策记录、同步 `docs/TECH-DESIGN.md`，并在 PR 里说明；不在代码里悄悄偏离这 28 项已锁定决策。
+- **改产品决策**：先改 `docs/PRD.md` §15 决策记录、同步 `docs/TECH-DESIGN.md`，并在 PR 里说明；不在代码里悄悄偏离这 31 项已锁定决策。
 - **未验证的标 ⚠️**：`TECH-DESIGN.md §20` 的 7 项待实测，抓包确认前不得写成"已实现"或"已知"。
 - **发布**：打 `v*` tag，tag 必须等于 `package.json` 版本（Release workflow 会校验）；不走手动 publish。
 
@@ -151,7 +151,7 @@ PRD §3.2 已把多平台、简历改写、自由生成招呼语、上传 PDF、
 | 投递执行、成功判据、节奏与熔断 | `docs/PRD.md` §5.5 · `docs/TECH-DESIGN.md` §9 |
 | 账本、事件 schema、重放 | `docs/PRD.md` §6 · `docs/TECH-DESIGN.md` §6 |
 | 对账与冷启动回填 | `docs/PRD.md` §5.7 · `docs/TECH-DESIGN.md` §10 |
-| host API 契约、面板三屏 | `docs/TECH-DESIGN.md` §11 · §12 |
+| host API 契约、面板四屏 | `docs/TECH-DESIGN.md` §11 · §12 |
 | 错误码 | `src/shared/errors.ts` · `docs/TECH-DESIGN.md` §15 |
 | 测试策略 | `docs/TECH-DESIGN.md` §17 |
 | 还没验证的假设 | `docs/TECH-DESIGN.md` §20 |

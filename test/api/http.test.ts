@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { API_PREFIX, createApi } from '../../src/api/handlers.ts'
+import { SettingsStore } from '../../src/settings.ts'
 import { mountApi } from '../../src/api/mount.ts'
 import { createRunTracker } from '../../src/api/views.ts'
 import { Ledger } from '../../src/ledger/store.ts'
@@ -35,6 +36,7 @@ async function serveApi(t: { after(fn: () => void): void }): Promise<{ base: str
     runner: { run: async () => DONE },
     provider,
     tracker: createRunTracker(),
+    settings: new SettingsStore(ledger),
     clock: () => NOW,
   })
 

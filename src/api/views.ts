@@ -15,6 +15,8 @@ import { queueRows, queueTotal } from '../ledger/queue.ts'
 import type { QueueFilter } from '../ledger/queue.ts'
 import { todaySubmissions } from '../run/executor.ts'
 import { DAILY_CAP } from '../run/pacing.ts'
+import type { SettingsStore } from '../settings.ts'
+import { LIMITS } from '../shared/profile.ts'
 import type {
   OverviewView,
   QueueRowView,
@@ -22,6 +24,7 @@ import type {
   ReconcileRowView,
   ReconcileView,
   RunView,
+  SettingsView,
 } from './contract.ts'
 
 /** Panel payload cap (TECH §11.4). */
@@ -173,4 +176,27 @@ export function blockedReason(
   if (lease !== undefined && Date.parse(lease.expiresAt) >= now) return 'leased'
   if (blockingAppForJob(projection, jobId) !== undefined) return 'already-applied'
   return undefined
+}
+
+/**
+ * Build the 设置 view: the editable target plus the hard ceilings.
+ *
+ * Settings are not events, so the revision is the ledger's — the screen does not poll, it loads once
+ * and refreshing it is not a correctness issue.
+ *
+ * @param settings live settings store
+ * @param revision ledger revision
+ * @returns the editable target and the read-only limits
+ */
+export function settingsView(settings: SettingsStore, revision: number): SettingsView {
+  const target = settings.target
+  return {
+    revision,
+    target: {
+      roles: [...target.roles],
+      cities: [...target.cities],
+      salaryMin: target.salaryMin,
+    },
+    limits: { runSize: LIMITS.runSize, daily: LIMITS.daily },
+  }
 }

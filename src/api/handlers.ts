@@ -17,6 +17,8 @@ import type { AppState } from '../ledger/events.ts'
 import type { Ledger } from '../ledger/store.ts'
 import type { QueueFilter } from '../ledger/queue.ts'
 import type { ReaderProvider } from '../runtime/browser.ts'
+import type { SettingsStore } from '../settings.ts'
+import { parseSettingsInput } from '../settings.ts'
 import { PluginError, userMessage } from '../shared/errors.ts'
 import { reconcileForModel } from '../tools/reconcile.ts'
 import type { RunStarter } from '../tools/apply.ts'
@@ -26,9 +28,16 @@ import type {
   QueueView,
   ReconcileView,
   RunView,
+  SettingsView,
 } from './contract.ts'
 import type { RunTracker } from './views.ts'
-import { overviewView, queueView, QUEUE_PAGE_LIMIT, reconcileView } from './views.ts'
+import {
+  overviewView,
+  queueView,
+  QUEUE_PAGE_LIMIT,
+  reconcileView,
+  settingsView,
+} from './views.ts'
 
 /** Prefix every route lives under (TECH §11.1). */
 export const API_PREFIX = '/job-ledger/api/'
@@ -58,6 +67,8 @@ export interface ApiDeps {
   readonly runner: RunStarter
   readonly provider: ReaderProvider
   readonly tracker: RunTracker
+  /** Panel-editable target settings; also the profile the tools read. */
+  readonly settings: SettingsStore
   readonly clock?: (() => number) | undefined
 }
 
@@ -197,6 +208,21 @@ export function createApi(deps: ApiDeps): ApiHandlers {
       if (route === 'GET overview') return { status: 200, body: overview() }
 
       if (route === 'GET run') return { status: 200, body: deps.tracker.run }
+
+      if (route === 'GET profile') {
+        return {
+          status: 200,
+          body: settingsView(deps.settings, deps.ledger.projection.revision) satisfies SettingsView,
+        }
+      }
+
+      if (route === 'POST profile') {
+        deps.settings.update(parseSettingsInput(request.body), clock())
+        return {
+          status: 200,
+          body: settingsView(deps.settings, deps.ledger.projection.revision) satisfies SettingsView,
+        }
+      }
 
       if (route === 'GET reconcile') {
         return {

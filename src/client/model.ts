@@ -8,6 +8,7 @@
  */
 
 import type { OverviewView, QueueRowView, RunView } from '../api/contract.ts'
+import type { MessageKey } from './locales.ts'
 
 /** Poll cadence while a run is active (TECH §11.4). */
 export const POLL_ACTIVE_MS = 1_000
@@ -16,7 +17,7 @@ export const POLL_ACTIVE_MS = 1_000
 export const POLL_IDLE_MS = 5_000
 
 /** Tabs of the panel (TECH §12.2). */
-export const TABS = ['queue', 'overview', 'reconcile'] as const
+export const TABS = ['queue', 'overview', 'reconcile', 'settings'] as const
 
 /** One tab name. */
 export type Tab = (typeof TABS)[number]
@@ -103,4 +104,48 @@ export function runLabel(state: RunView['state']): string {
     case 'done-with-errors':
       return '完成（有失败）'
   }
+}
+
+/** Decision codes that have a human label; anything else is shown as the raw code. */
+const REASON_KEYS: Readonly<Record<string, MessageKey>> = {
+  new: 'reasonNew',
+  'same-posting': 'reasonSamePosting',
+  'same-role-company': 'reasonSameRoleCompany',
+  'cross-source-same-jd': 'reasonCrossSource',
+  cooldown: 'reasonCooldown',
+  'same-title-different-jd': 'reasonSameTitle',
+  'company-blacklist': 'reasonCompanyBlacklist',
+  'excluded-keyword': 'reasonExcludedKeyword',
+  'city-mismatch': 'reasonCityMismatch',
+  'salary-below-floor': 'reasonSalaryFloor',
+}
+
+/**
+ * Translate a decision code for the row tag.
+ *
+ * @param reason code from the ledger
+ * @returns the locale key, or undefined when the code has no label yet
+ */
+export function reasonKey(reason: string): MessageKey | undefined {
+  return REASON_KEYS[reason]
+}
+
+/** The locale key of a run state, so the status pill follows the host language. */
+export const RUN_KEYS: Record<RunView['state'], MessageKey> = {
+  idle: 'runIdle',
+  queued: 'runQueued',
+  running: 'runRunning',
+  paused: 'runPaused',
+  halted: 'runHalted',
+  done: 'runDone',
+  'done-with-errors': 'runDoneWithErrors',
+}
+
+/**
+ * Whether a run is still moving, which decides the poll cadence and the status colour.
+ *
+ * @param view latest overview @returns true while queued or running
+ */
+export function runActive(view: OverviewView | undefined): boolean {
+  return view?.run.state === 'running' || view?.run.state === 'queued'
 }

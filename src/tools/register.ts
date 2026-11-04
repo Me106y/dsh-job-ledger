@@ -13,6 +13,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { LedgerConfig } from '../config.ts'
 import type { Ledger } from '../ledger/store.ts'
 import type { ReaderProvider } from '../runtime/browser.ts'
+import type { ProfileSource } from '../settings.ts'
 import {
   RESUME_TOOL_DESCRIPTION,
   RESUME_TOOL_NAME,
@@ -123,9 +124,15 @@ export function registerResumeTool(
  * @param ledger the single writer
  * @param runtime reader provider
  * @param config resolved configuration
+ * @param source the live profile (the panel can change the target after mount)
  * @returns the definition to register
  */
-export function discoverTool(ledger: Ledger, runtime: ReaderProvider, config: LedgerConfig) {
+export function discoverTool(
+  ledger: Ledger,
+  runtime: ReaderProvider,
+  config: LedgerConfig,
+  source: ProfileSource,
+) {
   return defineTool({
     name: DISCOVER_TOOL_NAME,
     description: DISCOVER_TOOL_DESCRIPTION,
@@ -188,7 +195,7 @@ export function discoverTool(ledger: Ledger, runtime: ReaderProvider, config: Le
     },
     timeoutMs: 120_000,
     async execute(args) {
-      return discoverForModel(runtime, ledger, config.profile, {
+      return discoverForModel(runtime, ledger, source.profile, {
         source: args.source === 'recommend' ? 'recommend' : 'search',
         ...(args.limit === undefined ? {} : { limit: args.limit }),
       })
@@ -210,8 +217,9 @@ export function registerDiscoverTool(
   ledger: Ledger,
   runtime: ReaderProvider,
   config: LedgerConfig,
+  source: ProfileSource,
 ): () => void {
-  return ctx.tools.register(discoverTool(ledger, runtime, config))
+  return ctx.tools.register(discoverTool(ledger, runtime, config, source))
 }
 
 /**
@@ -533,12 +541,13 @@ export function registerReportTool(ctx: Context, ledger: Ledger, dataDir: string
 }
 
 /**
- * Build the profile tool definition. Read-only; no configuration is written.
+ * Build the profile tool definition. Read-only; the panel is the only writer.
  *
  * @param config resolved configuration
+ * @param source the live profile, so panel edits show up without a restart
  * @returns the definition to register
  */
-export function profileTool(config: LedgerConfig) {
+export function profileTool(config: LedgerConfig, source: ProfileSource) {
   return defineTool({
     name: PROFILE_TOOL_NAME,
     description: PROFILE_TOOL_DESCRIPTION,
@@ -558,7 +567,7 @@ export function profileTool(config: LedgerConfig) {
     },
     async execute() {
       // Round-trip so the value is lossless JSON, which is what the `json` output node enforces.
-      return JSON.parse(JSON.stringify(profileView(config))) as never
+      return JSON.parse(JSON.stringify(profileView({ ...config, profile: source.profile }))) as never
     },
   })
 }
@@ -569,8 +578,12 @@ export function profileTool(config: LedgerConfig) {
  * @param ctx host context @param config resolved configuration
  * @returns the disposer
  */
-export function registerProfileTool(ctx: Context, config: LedgerConfig): () => void {
-  return ctx.tools.register(profileTool(config))
+export function registerProfileTool(
+  ctx: Context,
+  config: LedgerConfig,
+  source: ProfileSource,
+): () => void {
+  return ctx.tools.register(profileTool(config, source))
 }
 
 /**

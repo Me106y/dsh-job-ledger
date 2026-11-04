@@ -6,60 +6,87 @@
 
 import type { ReactElement } from 'react'
 
-import type { OverviewView } from '../api/contract.ts'
+import type { OverviewView, SettingsView } from '../api/contract.ts'
 import type { ScreenProps } from './app.tsx'
-import { remainingQuota, runLabel } from './model.ts'
+import { RUN_KEYS, remainingQuota } from './model.ts'
 
 /**
- * @param props overview payload, run flag, translator
+ * @param props overview payload, target settings, translator
  * @returns the overview tab
  */
 export function Overview({
   view,
+  settings,
   running,
-}: ScreenProps & { readonly view: OverviewView | undefined }): ReactElement {
-  if (view === undefined) return <p style={{ opacity: 0.7 }}>…</p>
+  t,
+  onOpenSettings,
+}: ScreenProps & {
+  readonly view: OverviewView | undefined
+  readonly settings: SettingsView | undefined
+  readonly onOpenSettings: () => void
+}): ReactElement {
+  if (view === undefined) {
+    return (
+      <div className="jl-card">
+        <p className="jl-loading">{t('loading')}</p>
+      </div>
+    )
+  }
 
-  const cards: readonly { label: string; value: string }[] = [
-    { label: '今日已投', value: String(view.today.submitted) },
-    { label: '剩余额度', value: String(remainingQuota(view)) },
-    { label: '待处理的不确定', value: String(view.uncertain) },
-    { label: '对账差异', value: String(view.discrepancies) },
-    { label: '昨日回复', value: String(view.repliedYesterday) },
+  const cards: readonly { label: string; value: number; tone: string }[] = [
+    { label: t('todaySubmitted'), value: view.today.submitted, tone: '' },
+    { label: t('quota'), value: remainingQuota(view), tone: '' },
+    { label: t('uncertain'), value: view.uncertain, tone: view.uncertain > 0 ? 'is-alert' : '' },
+    { label: t('discrepancies'), value: view.discrepancies, tone: view.discrepancies > 0 ? 'is-warn' : '' },
+    { label: t('repliedYesterday'), value: view.repliedYesterday, tone: '' },
   ]
 
+  const target = settings?.target
+  const roles = target === undefined || target.roles.length === 0 ? t('rolesFromResume') : target.roles.join('、')
+  const cities = target === undefined || target.cities.length === 0 ? t('citiesUnlimited') : target.cities.join('、')
+  const salary = target === undefined || target.salaryMin === 0 ? '' : ` · ${String(target.salaryMin)}K+`
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div className="jl-stats">
         {cards.map((card) => (
-          <div
-            key={card.label}
-            style={{
-              padding: '10px 12px',
-              border: '1px solid var(--dsh-border, #e2e2e2)',
-              borderRadius: 8,
-            }}
-          >
-            <div style={{ fontSize: 12, opacity: 0.7 }}>{card.label}</div>
-            <div style={{ fontSize: 22, fontWeight: 600 }}>{card.value}</div>
+          <div key={card.label} className={`jl-stat ${card.tone}`}>
+            <div className="jl-stat-label">{card.label}</div>
+            <div className="jl-stat-value">{String(card.value)}</div>
           </div>
         ))}
       </div>
 
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
-        <span
-          style={{
-            width: 8,
-            height: 8,
-            borderRadius: 4,
-            background: running ? 'var(--dsh-accent, #2563eb)' : 'var(--dsh-border, #bbb)',
-          }}
-        />
-        <span>
-          {runLabel(view.run.state)}
-          {view.run.total > 0 ? ` ${String(view.run.done)}/${String(view.run.total)}` : ''}
-        </span>
-        {view.run.haltReason !== undefined ? <span style={{ opacity: 0.7 }}>({view.run.haltReason})</span> : null}
+      <div className="jl-card">
+        <div className="jl-card-head">
+          <h2 className="jl-card-title">{t('targetSummary')}</h2>
+          <button type="button" className="jl-inline-link" onClick={onOpenSettings}>
+            {t('changeInSettings')}
+          </button>
+        </div>
+        <div className="jl-card-body is-padded">
+          <div className="jl-row-meta" style={{ fontSize: 13 }}>
+            <span>{roles}</span>
+            <span className="jl-sep">·</span>
+            <span>{cities}</span>
+            {salary === '' ? null : <span>{salary}</span>}
+          </div>
+        </div>
+      </div>
+
+      <div className="jl-card">
+        <div className="jl-card-body is-padded">
+          <span className={`jl-pill${running ? ' is-running' : ''}`}>
+            <i className="jl-dot" />
+            {t(RUN_KEYS[view.run.state])}
+            {view.run.total > 0 ? ` ${String(view.run.done)}/${String(view.run.total)}` : ''}
+          </span>
+          {view.run.haltReason === undefined ? null : (
+            <span className="jl-error" style={{ marginLeft: 10 }}>
+              {view.run.haltReason}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   )

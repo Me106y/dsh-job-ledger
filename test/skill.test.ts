@@ -30,7 +30,7 @@ test('the registration matches the skill registry contract', () => {
 })
 
 test('registration is skipped when the host has no skill registry', () => {
-  const disposer = registerSkill({} as never, 'body')
+  const disposer = registerSkill({ get: () => undefined } as never, 'body')
   assert.equal(disposer, undefined)
 })
 
@@ -38,13 +38,16 @@ test('registration hands the skill to the registry and returns its disposer', ()
   let registered: unknown
   let disposed = false
   const ctx = {
-    skills: {
-      register(skill: unknown) {
-        registered = skill
-        return () => {
-          disposed = true
-        }
-      },
+    get(name: string) {
+      if (name !== 'skills') return undefined
+      return {
+        register(skill: unknown) {
+          registered = skill
+          return () => {
+            disposed = true
+          }
+        },
+      }
     },
   }
 
