@@ -190,6 +190,10 @@ export class CdpReader implements BrowserPort {
     // would take the whole process down before the await below runs. Mark it handled, and keep
     // awaiting the same promise: a real timeout still throws there.
     settled.catch(() => undefined)
+    // A background tab is throttled: its timers, layout and event handlers stall, so a click sent
+    // to one lands on a page that has not finished hydrating. The tab the plugin drives is brought
+    // to the front first, exactly like a person opening the page would.
+    await this.#session.call('Page.bringToFront', {}, 5_000).catch(() => undefined)
     await this.#session.call('Page.navigate', { url }, NAVIGATE_TIMEOUT_MS)
     const event = await settled
 
