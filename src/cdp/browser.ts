@@ -50,6 +50,9 @@ export interface BrowserPort extends BrowserReader {
 /** How often the DOM is polled while waiting for a selector. */
 const DOM_POLL_MS = 150
 
+/** How long to let the page react to a click before deciding whether the element really moved. */
+const DOM_SETTLE_MS = 250
+
 /** @param ms milliseconds @returns a promise that settles afterwards */
 function delay(ms: number): Promise<void> {
   return new Promise<void>((resolve) => setTimeout(resolve, ms))
@@ -311,9 +314,12 @@ export class CdpReader implements BrowserPort {
         clickCount: 1,
       })
 
-      // If the element vanished between measuring and clicking, the click went nowhere.
+      // A button that navigates (立即沟通 → chat) disappears *because* the click worked. Treating
+      // that as a miss retried the click and then failed an application that had already been
+      // sent — the ledger said "failed" for a message the platform delivered.
+      await delay(DOM_SETTLE_MS)
       const stillThere = await this.#elementCentre(selector)
-      if (stillThere !== undefined) return
+      if (stillThere === undefined) return
     }
     throw new PluginError('E_SELECTOR_MISSING', { what: selector })
   }

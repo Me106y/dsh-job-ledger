@@ -1,7 +1,7 @@
 # AGENTS.md
 
 > 给 Agent 的项目指令。只放两类内容：**项目全貌** + **违反就会出错的硬规则**；细节一律链到 `docs/`。
-> 真理源：产品看 `docs/PRD.md`（v0.7，38 项决策已锁定），实现看 `docs/TECH-DESIGN.md`（v0.1）。
+> 真理源：产品看 `docs/PRD.md`（v0.8，39 项决策已锁定），实现看 `docs/TECH-DESIGN.md`（v0.1）。
 > 本文与 docs 冲突时以 docs 为准，并在同一个 PR 里修正本文。
 
 ## 项目概述
@@ -124,7 +124,7 @@ PRD §3.2 已把多平台、简历改写、自由生成招呼语、上传 PDF、
 - **agent 提的 PR，第一行写 `This is by an automated agent, not a human.`**，让人一眼分得清谁写的。
 - **CI 必须绿**：`typecheck · test · build` 外加一条 tarball 内容断言；本地等价命令是 `pnpm check`。不绕过、不跳过。
 - **合并用 merge commit**（保留分支上的提交），不 squash，也不 rebase 掉历史。
-- **改产品决策**：先改 `docs/PRD.md` §15 决策记录、同步 `docs/TECH-DESIGN.md`，并在 PR 里说明；不在代码里悄悄偏离这 38 项已锁定决策。
+- **改产品决策**：先改 `docs/PRD.md` §15 决策记录、同步 `docs/TECH-DESIGN.md`，并在 PR 里说明；不在代码里悄悄偏离这 39 项已锁定决策。
 - **未验证的标 ⚠️**：`TECH-DESIGN.md §20` 的 7 项待实测，抓包确认前不得写成"已实现"或"已知"。
 - **发布**：打 `v*` tag，tag 必须等于 `package.json` 版本（Release workflow 会校验）；不走手动 publish。
 

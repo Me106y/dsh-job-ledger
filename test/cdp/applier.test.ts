@@ -21,6 +21,8 @@ interface PortOptions {
   readonly currentUrl?: string
   /** Where navigation actually lands, e.g. the login wall. */
   readonly redirectTo?: string
+  /** Where the contact click lands; BOSS sends its own greeting and jumps to the chat. */
+  readonly clickNavigatesTo?: string
   readonly chat?: string
 }
 
@@ -33,12 +35,14 @@ class FakePort implements BrowserPort {
   #capture: () => Promise<unknown>
   #chat: string
   #redirectTo: string | undefined
+  #clickNavigatesTo: string | undefined
 
   constructor(options: PortOptions = {}) {
     this.#present = new Set(options.present ?? [])
     this.#capture = options.capture ?? (() => Promise.resolve({ code: 0 }))
     this.#chat = options.chat ?? '你好，我想投递这个岗位'
     this.#redirectTo = options.redirectTo
+    this.#clickNavigatesTo = options.clickNavigatesTo
     if (options.currentUrl !== undefined) this.url = options.currentUrl
   }
 
@@ -54,6 +58,9 @@ class FakePort implements BrowserPort {
 
   async click(selector: string): Promise<void> {
     this.calls.push(`click:${selector}`)
+    if (selector === BOSS_SELECTORS.contactButton && this.#clickNavigatesTo !== undefined) {
+      this.url = this.#clickNavigatesTo
+    }
   }
 
   async typeText(selector: string, text: string): Promise<void> {
@@ -195,4 +202,16 @@ test('capture returns the screenshot and the chat transcript', async () => {
 
   assert.equal(evidence.png.toString(), 'png')
   assert.equal(evidence.chat, '你好，方便聊聊吗')
+})
+
+test('when 立即沟通 already opened the chat, no second greeting is typed', async () => {
+  const port = readyPort({ clickNavigatesTo: 'https://www.zhipin.com/web/geek/chat?id=abc&jobId=ext_1' })
+  const applier = new BossApplier(port)
+
+  const result = await applier.send(JOB, '你好，我想投递')
+
+  assert.equal(result.clicked, true)
+  // BOSS sent its own default greeting with the click; typing here would message the same HR twice.
+  assert.ok(!port.calls.some((call) => call.startsWith('type:')), port.calls.join(', '))
+  assert.ok(!port.calls.includes(`click:${BOSS_SELECTORS.sendButton}`), port.calls.join(', '))
 })
