@@ -29,6 +29,8 @@ export interface ApplierTimings {
   readonly resumeButtonTimeoutMs?: number
   /** How long the contact button gets to turn into 继续沟通 before a retry. */
   readonly contactSettleMs?: number
+  /** How long clicks are retried while the button still says 立即沟通. */
+  readonly contactDeadlineMs?: number
 }
 
 const DEFAULT_SEND_TIMEOUT_MS = 15_000
@@ -38,6 +40,9 @@ const DEFAULT_RESUME_BUTTON_TIMEOUT_MS = 800
 
 /** How long the contact button gets to turn into 继续沟通 before the click is retried. */
 const CONTACT_SETTLE_MS = 1_200
+
+/** How long to keep retrying a contact click the page swallowed. */
+const CONTACT_DEADLINE_MS = 9_000
 
 /** Sends one application through a real page. */
 export class BossApplier implements JobApplier {
@@ -57,6 +62,7 @@ export class BossApplier implements JobApplier {
       resumeButtonTimeoutMs:
         timings.resumeButtonTimeoutMs ?? DEFAULT_RESUME_BUTTON_TIMEOUT_MS,
       contactSettleMs: timings.contactSettleMs ?? CONTACT_SETTLE_MS,
+      contactDeadlineMs: timings.contactDeadlineMs ?? CONTACT_DEADLINE_MS,
     }
   }
 
@@ -82,21 +88,15 @@ export class BossApplier implements JobApplier {
     // Arm before clicking: the request is fired by the click itself.
     const network = this.#watchSendResponse()
 
-    await this.#port.click(BOSS_SELECTORS.contactButton)
-    // The button turns into 继续沟通 the moment the platform accepted the contact. If it still says
-    // 立即沟通 a moment later, the SPA had not bound its handler yet and the click was swallowed —
-    // one more click is safe: the second one lands on an already-created conversation at worst.
-    await new Promise<void>((resolve) => setTimeout(resolve, this.#timings.contactSettleMs))
-    if ((await this.#port.text(BOSS_SELECTORS.contactButton)).includes('立即沟通')) {
-      await this.#port.click(BOSS_SELECTORS.contactButton)
-      await new Promise<void>((resolve) => setTimeout(resolve, this.#timings.contactSettleMs))
-    }
-
-    // 立即沟通 sends the platform's own greeting and *then* opens the chat. Typing our greeting on
-    // that page would send a second message to the same recruiter, so the typing step only runs
-    // when the click stayed on the job page (an in-page composer) instead of navigating to chat.
+    // 立即沟通 turns into 继续沟通 the moment the platform accepts the contact, and on a freshly
+    // navigated SPA the first clicks are swallowed until the handlers are bound. So click until
+    // that change is observed; a click that lands after acceptance only opens the conversation.
+    const accepted = await this.#contactUntilAccepted()
     const openedChat = /\/web\/geek\/chat/.test(await this.#port.currentUrl())
-    if (!openedChat && (await this.#port.waitFor(BOSS_SELECTORS.greetingInput, this.#timings.greetTimeoutMs))) {
+
+    // The platform's own greeting goes out with the contact, so our greeting is only sent when the
+    // platform did not handle it: typing after 继续沟通 would message the same recruiter twice.
+    if (!accepted && !openedChat && (await this.#port.waitFor(BOSS_SELECTORS.greetingInput, this.#timings.greetTimeoutMs))) {
       await this.#port.typeText(BOSS_SELECTORS.greetingInput, greeting)
       try {
         await this.#port.click(BOSS_SELECTORS.sendButton)
@@ -122,6 +122,23 @@ export class BossApplier implements JobApplier {
     const png = await this.#port.screenshot()
     const chat = await this.#port.text(BOSS_SELECTORS.chatPanel)
     return { png, chat }
+  }
+
+  /**
+   * Click 立即沟通 until the page shows 继续沟通 (or the deadline passes).
+   *
+   * @returns whether the platform accepted the contact
+   */
+  async #contactUntilAccepted(): Promise<boolean> {
+    const deadline = Date.now() + this.#timings.contactDeadlineMs
+    for (;;) {
+      await this.#port.click(BOSS_SELECTORS.contactButton)
+      await new Promise<void>((resolve) => setTimeout(resolve, this.#timings.contactSettleMs))
+      const label = await this.#port.text(BOSS_SELECTORS.contactButton)
+      // An empty label means the button left the page (chat opened); that is acceptance too.
+      if (!label.includes('立即沟通')) return true
+      if (Date.now() >= deadline) return false
+    }
   }
 
   /**
