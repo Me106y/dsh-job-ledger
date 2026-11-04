@@ -24,6 +24,9 @@ export const MAX_TERM_CHARS = 30
 /** Salary floor ceiling, in yuan per month. The floor shares `TargetRules.salaryMin`'s unit. */
 export const MAX_SALARY_MIN = 999_999
 
+/** Longest tracker path accepted; longer is a paste accident, not a file name. */
+export const MAX_TRACKER_PATH = 1024
+
 /** The target fields the panel may change. */
 export interface TargetSettings {
   readonly roles: readonly string[]
@@ -36,6 +39,8 @@ export interface SettingsInput {
   readonly roles?: readonly string[] | undefined
   readonly cities?: readonly string[] | undefined
   readonly salaryMin?: number | undefined
+  /** Tracker sheet path (PRD §5.11); an empty string turns the feature off. */
+  readonly trackerPath?: string | undefined
 }
 
 /** Anything that can answer "what is the profile now?" — tools and the API both use it. */
@@ -89,7 +94,7 @@ export function parseSettingsInput(body: unknown): SettingsInput {
     throw new PluginError('E_INVALID_ARGUMENT', { what: 'body must be an object' })
   }
   const record = body as Record<string, unknown>
-  const input: { roles?: string[]; cities?: string[]; salaryMin?: number } = {}
+  const input: { roles?: string[]; cities?: string[]; salaryMin?: number; trackerPath?: string } = {}
 
   if (record['roles'] !== undefined) {
     if (!Array.isArray(record['roles'])) {
@@ -102,6 +107,19 @@ export function parseSettingsInput(body: unknown): SettingsInput {
       throw new PluginError('E_INVALID_ARGUMENT', { what: 'cities must be a list of strings' })
     }
     input.cities = cleanTerms(record['cities'], 'cities')
+  }
+  if (record['trackerPath'] !== undefined) {
+    const path = record['trackerPath']
+    if (typeof path !== 'string') {
+      throw new PluginError('E_INVALID_ARGUMENT', { what: 'trackerPath must be a string' })
+    }
+    const trimmed = path.trim()
+    if (trimmed.length > MAX_TRACKER_PATH) {
+      throw new PluginError('E_INVALID_ARGUMENT', {
+        what: `trackerPath must be at most ${String(MAX_TRACKER_PATH)} characters`,
+      })
+    }
+    input.trackerPath = trimmed
   }
   if (record['salaryMin'] !== undefined) {
     const salary = record['salaryMin']
@@ -153,9 +171,10 @@ export class SettingsStore implements ProfileSource {
       cities: input.cities ?? current.cities,
       salaryMin: input.salaryMin ?? current.salaryMin,
     }
+    const tracker = input.trackerPath
     this.#ledger.append({
       type: 'profile/set',
-      profile: { target: next },
+      profile: { target: next, ...(tracker === undefined ? {} : { tracker: { path: tracker } }) },
       at: new Date(now).toISOString(),
     })
     return next

@@ -76,6 +76,11 @@ export interface RunnerContext {
   readonly newAppId?: (() => string) | undefined
   readonly newRunId?: (() => string) | undefined
   readonly sleep?: ((ms: number) => Promise<void>) | undefined
+  /**
+   * Called after one application reached `submitted` (PRD §5.11). Fire-and-forget: the sheet is a
+   * copy, so a slow or failing write must never delay or fail the run.
+   */
+  readonly onSubmitted?: ((job: Job, appId: string, at: string) => void) | undefined
 }
 
 /** What the caller asked for. */
@@ -122,6 +127,7 @@ export class JobRunner {
   readonly #newAppId: () => string
   readonly #newRunId: () => string
   readonly #sleep: (ms: number) => Promise<void>
+  readonly #onSubmitted: ((job: Job, appId: string, at: string) => void) | undefined
   #active = false
 
   /** @param context collaborators and injectable side effects */
@@ -134,6 +140,7 @@ export class JobRunner {
     this.#newAppId = context.newAppId ?? (() => `a_${randomUUID()}`)
     this.#newRunId = context.newRunId ?? (() => `r_${randomUUID()}`)
     this.#sleep = context.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)))
+    this.#onSubmitted = context.onSubmitted
   }
 
   /**
@@ -296,6 +303,12 @@ export class JobRunner {
             evidence: path,
             at: new Date(this.#clock()).toISOString(),
           })
+          const at = new Date(this.#clock()).toISOString()
+          try {
+            this.#onSubmitted?.(job, appId, at)
+          } catch {
+            // The sheet is a copy of the ledger; a failed write is reported on the next sync.
+          }
           return { kind: 'submitted' }
         } catch (error) {
           // The send is confirmed by the network; only the proof is missing. Recording `failed`
