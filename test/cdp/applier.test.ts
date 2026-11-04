@@ -128,7 +128,7 @@ test('the response is armed before the click that triggers it', async () => {
 test('a full send clicks, types the greeting, and reports the card', async () => {
   // A platform that does not greet on its own: the button never turns into 继续沟通.
   const port = readyPort({ contactLabels: ['立即沟通'] })
-  const applier = new BossApplier(port, { contactSettleMs: 0, contactDeadlineMs: 0 })
+  const applier = new BossApplier(port, { contactSettleMs: 0, contactReadyMs: 0, contactAttempts: 1 })
 
   const result = await applier.send(JOB, '你好，我想投递')
 
@@ -191,7 +191,7 @@ test('an optional send-resume button is clicked when present', async () => {
     ],
     contactLabels: ['立即沟通'],
   })
-  await new BossApplier(port, { contactSettleMs: 0, contactDeadlineMs: 0 }).send(JOB, '你好')
+  await new BossApplier(port, { contactSettleMs: 0, contactReadyMs: 0, contactAttempts: 1 }).send(JOB, '你好')
 
   assert.ok(port.calls.includes(`click:${BOSS_SELECTORS.sendResumeButton}`))
 })
@@ -232,10 +232,13 @@ test('when 立即沟通 already opened the chat, no second greeting is typed', a
 /** @param options port options @returns an applier whose contact settle is instant in tests */
 function fastApplier(options: PortOptions = {}): { applier: BossApplier; port: FakePort } {
   const port = readyPort(options)
-  return { port, applier: new BossApplier(port, { contactSettleMs: 0 }) }
+  return {
+    port,
+    applier: new BossApplier(port, { contactSettleMs: 0, contactReadyMs: 0, contactRetryMs: 0 }),
+  }
 }
 
-test('a click the page ignored is retried once, so a swallowed click is not a failed attempt', async () => {
+test('a click the page ignored is retried, so a swallowed click is not a failed attempt', async () => {
   const { applier, port } = fastApplier({ contactLabels: ['立即沟通', '继续沟通'] })
 
   await applier.send(JOB, '你好')
@@ -255,6 +258,15 @@ test('a contact that already turned into 继续沟通 is clicked once', async ()
 
 test('the contact click keeps retrying until the button turns into 继续沟通', async () => {
   const { applier, port } = fastApplier({ contactLabels: ['立即沟通', '立即沟通', '继续沟通'] })
+
+  await applier.send(JOB, '你好')
+
+  const clicks = port.calls.filter((call) => call === `click:${BOSS_SELECTORS.contactButton}`)
+  assert.equal(clicks.length, 3)
+})
+
+test('three swallowed clicks give up instead of clicking forever', async () => {
+  const { applier, port } = fastApplier({ contactLabels: ['立即沟通'] })
 
   await applier.send(JOB, '你好')
 

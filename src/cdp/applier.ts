@@ -29,8 +29,12 @@ export interface ApplierTimings {
   readonly resumeButtonTimeoutMs?: number
   /** How long the contact button gets to turn into 继续沟通 before a retry. */
   readonly contactSettleMs?: number
-  /** How long clicks are retried while the button still says 立即沟通. */
-  readonly contactDeadlineMs?: number
+  /** How long to let the page bind its handlers before the first click. */
+  readonly contactReadyMs?: number
+  /** How many times the contact is clicked before giving up. */
+  readonly contactAttempts?: number
+  /** Gap between two contact clicks. */
+  readonly contactRetryMs?: number
 }
 
 const DEFAULT_SEND_TIMEOUT_MS = 15_000
@@ -41,8 +45,14 @@ const DEFAULT_RESUME_BUTTON_TIMEOUT_MS = 800
 /** How long the contact button gets to turn into 继续沟通 before the click is retried. */
 const CONTACT_SETTLE_MS = 1_200
 
-/** How long to keep retrying a contact click the page swallowed. */
-const CONTACT_DEADLINE_MS = 9_000
+/** How long the page gets to bind its handlers before the first contact click. */
+const CONTACT_READY_MS = 5_000
+
+/** How many contact clicks are attempted. */
+const CONTACT_ATTEMPTS = 3
+
+/** Gap between two contact clicks. */
+const CONTACT_RETRY_MS = 1_500
 
 /** Sends one application through a real page. */
 export class BossApplier implements JobApplier {
@@ -62,7 +72,9 @@ export class BossApplier implements JobApplier {
       resumeButtonTimeoutMs:
         timings.resumeButtonTimeoutMs ?? DEFAULT_RESUME_BUTTON_TIMEOUT_MS,
       contactSettleMs: timings.contactSettleMs ?? CONTACT_SETTLE_MS,
-      contactDeadlineMs: timings.contactDeadlineMs ?? CONTACT_DEADLINE_MS,
+      contactReadyMs: timings.contactReadyMs ?? CONTACT_READY_MS,
+      contactAttempts: timings.contactAttempts ?? CONTACT_ATTEMPTS,
+      contactRetryMs: timings.contactRetryMs ?? CONTACT_RETRY_MS,
     }
   }
 
@@ -130,15 +142,20 @@ export class BossApplier implements JobApplier {
    * @returns whether the platform accepted the contact
    */
   async #contactUntilAccepted(): Promise<boolean> {
-    const deadline = Date.now() + this.#timings.contactDeadlineMs
-    for (;;) {
+    // The button exists in the DOM before the page binds its click handler, and clicking during
+    // that window appears to be ignored. A quiet moment first is what makes the first click land.
+    await new Promise<void>((resolve) => setTimeout(resolve, this.#timings.contactReadyMs))
+    for (let attempt = 0; attempt < this.#timings.contactAttempts; attempt += 1) {
+      if (attempt > 0) {
+        await new Promise<void>((resolve) => setTimeout(resolve, this.#timings.contactRetryMs))
+      }
       await this.#port.click(BOSS_SELECTORS.contactButton)
       await new Promise<void>((resolve) => setTimeout(resolve, this.#timings.contactSettleMs))
       const label = await this.#port.text(BOSS_SELECTORS.contactButton)
       // An empty label means the button left the page (chat opened); that is acceptance too.
       if (!label.includes('立即沟通')) return true
-      if (Date.now() >= deadline) return false
     }
+    return false
   }
 
   /**
