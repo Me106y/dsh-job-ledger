@@ -23,6 +23,10 @@ const deliver = JSON.parse(
   readFileSync(fileURLToPath(new URL('../fixtures/cdp/deliver-list.json', import.meta.url)), 'utf8'),
 ) as unknown
 
+const search = JSON.parse(
+  readFileSync(fileURLToPath(new URL('../fixtures/cdp/search.json', import.meta.url)), 'utf8'),
+) as unknown
+
 /** @param t test context @returns an open ledger in a temp directory */
 function tempLedger(t: { after(fn: () => void): void }): Ledger {
   const dir = mkdtempSync(join(tmpdir(), 'job-ledger-api-'))
@@ -201,4 +205,117 @@ test('an unknown route is a 404 with a code', async (t) => {
 
   assert.equal(result.status, 404)
   assert.equal((result.body as { code: string }).code, 'E_INVALID_ARGUMENT')
+})
+
+test('queue/update runs one discovery pass and returns the counts with the new queue', async (t) => {
+  const ledger = tempLedger(t)
+  const api = apiFor(ledger, undefined, new ReplayBrowser({ search }))
+
+  const result = await api({ method: 'POST', path: 'queue/update', body: {} })
+
+  assert.equal(result.status, 200)
+  const body = result.body as {
+    source: string
+    added: number
+    duplicates: number
+    filtered: number
+    suspects: number
+    queue: { rows: { jobId: string }[] }
+  }
+  assert.equal(body.source, 'search')
+  assert.equal(body.added, 1)
+  assert.equal(body.duplicates, 1)
+  assert.equal(body.filtered, 1)
+  assert.equal(body.suspects, 0)
+  // The queue in the response already contains what the pass added.
+  assert.equal(body.queue.rows.length, 1)
+  assert.equal(ledger.projection.jobs.size, 2)
+})
+
+test('queue/update reports a login wall as its code instead of an empty result', async (t) => {
+  const ledger = tempLedger(t)
+  const browser = new ReplayBrowser({ search })
+  browser.url = 'https://www.zhipin.com/web/user/?ka=header-login'
+  const api = apiFor(ledger, undefined, browser)
+
+  const result = await api({ method: 'POST', path: 'queue/update', body: {} })
+
+  assert.equal(result.status, 401)
+  assert.equal((result.body as { code: string }).code, 'E_LOGIN_REQUIRED')
+})
+
+test('queue/update is refused while a run drives the same browser', async (t) => {
+  const ledger = tempLedger(t)
+  const tracker = createRunTracker()
+  tracker.set({ state: 'running', total: 2, done: 0 })
+  const api = createApi({
+    ledger,
+    runner: starter(DONE).starter,
+    provider: provider(new ReplayBrowser({ search })),
+    tracker,
+    settings: new SettingsStore(ledger),
+    clock: () => NOW,
+  })
+
+  const result = await api({
+    method: 'POST',
+    path: 'queue/update',
+    headers: { 'x-job-ledger-request': '1' },
+  })
+
+  assert.equal(result.status, 409)
+  assert.equal((result.body as { code: string }).code, 'E_RUN_ACTIVE')
+  // Refused before touching the ledger: the pass did not run.
+  assert.equal(ledger.projection.jobs.size, 0)
+})
+
+test('queue/update is refused while a live lease says a job is being clicked', async (t) => {
+  const ledger = tempLedger(t)
+  const job = makeJob({ id: 'j_9', company: '某公司', title: '后端工程师', city: '深圳' })
+  ledger.append({ type: 'job/add', job, at: AT })
+  ledger.append({
+    type: 'lease/grant',
+    jobId: job.id,
+    owner: 'r_1',
+    expiresAt: new Date(NOW + 1_000).toISOString(),
+    at: AT,
+  })
+  const api = apiFor(ledger, undefined, new ReplayBrowser({ search }))
+
+  const result = await api({ method: 'POST', path: 'queue/update', body: {} })
+
+  assert.equal(result.status, 409)
+  assert.equal((result.body as { code: string }).code, 'E_RUN_ACTIVE')
+  assert.equal(ledger.projection.jobs.size, 1)
+})
+
+test('jobs/:id/skip records the decision and the row leaves the queue', async (t) => {
+  const ledger = tempLedger(t)
+  const job = makeJob({ id: 'j_1', company: '字节跳动', title: '后端工程师', city: '深圳' })
+  ledger.append({ type: 'job/add', job, at: AT })
+  ledger.append({ type: 'job/decision', jobId: job.id, decision: 'new', reason: 'new', at: AT })
+  const api = apiFor(ledger)
+  assert.equal(((await api({ method: 'GET', path: 'queue' })).body as { rows: unknown[] }).rows.length, 1)
+
+  const skipped = await api({ method: 'POST', path: 'jobs/j_1/skip' })
+
+  assert.equal(skipped.status, 200)
+  assert.deepEqual(skipped.body, { jobId: 'j_1', status: 'skipped' })
+  assert.equal(((await api({ method: 'GET', path: 'queue' })).body as { rows: unknown[] }).rows.length, 0)
+})
+
+test('skipping an applied posting is 409, an unknown id is 400', async (t) => {
+  const ledger = tempLedger(t)
+  const job = makeJob({ id: 'j_2', company: '某公司', title: '后端工程师', city: '深圳' })
+  ledger.append({ type: 'job/add', job, at: AT })
+  ledger.append({ type: 'app/create', app: makeApp(job.id, 'submitted'), at: AT })
+  const api = apiFor(ledger)
+
+  const applied = await api({ method: 'POST', path: 'jobs/j_2/skip' })
+  assert.equal(applied.status, 409)
+  assert.equal((applied.body as { code: string }).code, 'E_ALREADY_APPLIED')
+
+  const unknown = await api({ method: 'POST', path: 'jobs/j_missing/skip' })
+  assert.equal(unknown.status, 400)
+  assert.equal((unknown.body as { code: string }).code, 'E_INVALID_ARGUMENT')
 })

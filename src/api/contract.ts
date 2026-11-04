@@ -42,6 +42,24 @@ export interface QueueView {
   readonly filtered: number
 }
 
+/**
+ * POST queue/update: one discovery pass run from the panel, plus the queue it produced.
+ *
+ * The counts are what the person needs to trust the refresh — "nothing new" and "everything was a
+ * duplicate" look identical without them, and only one of those is worth retrying later.
+ */
+export interface QueueUpdateView {
+  readonly revision: number
+  readonly source: 'search' | 'recommend'
+  readonly added: number
+  readonly duplicates: number
+  readonly filtered: number
+  readonly suspects: number
+  readonly invalid: number
+  /** The new queue, so one round trip renders the result without waiting for the next poll. */
+  readonly queue: QueueView
+}
+
 /** Where the current run is (TECH §11.2 `RunView`). */
 export interface RunView {
   readonly runId?: string
@@ -126,6 +144,10 @@ export interface Api {
     body: { roles?: readonly string[]; cities?: readonly string[]; salaryMin?: number }
     response: SettingsView
   }
+  /** One discovery pass with the current target; never applies. */
+  'POST queue/update': { body?: { source?: 'search' | 'recommend' }; response: QueueUpdateView }
+  /** Delete one pending posting: appends `job/status = skipped`. */
+  'POST jobs/:id/skip': { response: { jobId: string; status: 'skipped' } }
   'POST apps/:id/state': {
     body: { state: AppState; note?: string }
     response: { appId: string; state: AppState }

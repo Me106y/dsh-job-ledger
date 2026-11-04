@@ -78,6 +78,25 @@ export function toggleSelection(selected: ReadonlySet<string>, jobId: string): S
 }
 
 /**
+ * Hide the rows a person just deleted until the next poll confirms them gone.
+ *
+ * Deletion writes a ledger event, but the queue payload on screen was rendered before it; without
+ * this the row would flash back for up to one poll interval and look like the delete failed.
+ *
+ * @param rows rows from the last queue payload @param removed job ids deleted since that payload
+ * @returns rows without those ids
+ */
+export function withoutRows(
+  rows: readonly QueueRowView[],
+  removed: ReadonlySet<string>,
+): QueueRowView[] {
+  return removed.size === 0 ? [...rows] : rows.filter((row) => !removed.has(row.jobId))
+}
+
+/** How long deletions are coalesced before one refill discovery runs (PRD §5.10 #34). */
+export const REFILL_DEBOUNCE_MS = 800
+
+/**
  * @param view overview payload @returns the quota remainder, never negative
  */
 export function remainingQuota(view: OverviewView): number {

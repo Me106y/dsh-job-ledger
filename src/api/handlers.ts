@@ -16,15 +16,19 @@
 import type { AppState } from '../ledger/events.ts'
 import type { Ledger } from '../ledger/store.ts'
 import type { QueueFilter } from '../ledger/queue.ts'
+import { skipJob } from '../ledger/skip.ts'
 import type { ReaderProvider } from '../runtime/browser.ts'
 import type { SettingsStore } from '../settings.ts'
 import { parseSettingsInput } from '../settings.ts'
 import { PluginError, userMessage } from '../shared/errors.ts'
+import { discoverForModel } from '../tools/discover.ts'
+import type { DiscoverySource } from '../discover/read.ts'
 import { reconcileForModel } from '../tools/reconcile.ts'
 import type { RunStarter } from '../tools/apply.ts'
 import type {
   ApiError,
   OverviewView,
+  QueueUpdateView,
   QueueView,
   ReconcileView,
   RunView,
@@ -95,6 +99,8 @@ function statusFor(code: PluginError['code']): number {
     case 'E_DAILY_QUOTA':
     case 'E_ILLEGAL_TRANSITION':
     case 'E_UNBALANCED':
+    case 'E_ALREADY_APPLIED':
+    case 'E_LEASE_HELD':
       return 409
     case 'E_INVALID_ARGUMENT':
     case 'E_NOT_CONFIGURED':
@@ -279,6 +285,49 @@ export function createApi(deps: ApiDeps): ApiHandlers {
           status: 200,
           body: reconcileView(deps.ledger.projection, lastReport),
         }
+      }
+
+      if (route === 'POST queue/update') {
+        // Discovery drives the same browser page a run is clicking; a second tab left open must not
+        // start a navigation in the middle of a run. A panel run is in the tracker; a model-started
+        // run is visible only through the lease it holds while clicking.
+        const now = clock()
+        const clicking =
+          deps.tracker.run.state === 'running' ||
+          deps.tracker.run.state === 'queued' ||
+          [...deps.ledger.projection.leases.values()].some(
+            (lease) => Date.parse(lease.expiresAt) >= now,
+          )
+        if (clicking) return { status: 409, body: failure('E_RUN_ACTIVE') }
+        const requested = (request.body as { source?: unknown } | undefined)?.source
+        const source: DiscoverySource = requested === 'recommend' ? 'recommend' : 'search'
+        // The live profile, not the YAML one: the panel's settings are what "current target" means.
+        const discovered = await discoverForModel(deps.provider, deps.ledger, deps.settings.profile, {
+          source,
+          now: clock(),
+        })
+        if (!discovered.ok) {
+          const code = discovered.code as PluginError['code']
+          return { status: statusFor(code), body: failure(code) }
+        }
+        const view: QueueUpdateView = {
+          revision: deps.ledger.projection.revision,
+          source: discovered.source,
+          added: discovered.added,
+          duplicates: discovered.duplicates,
+          filtered: discovered.filtered,
+          suspects: discovered.suspects,
+          invalid: discovered.invalid,
+          queue: queueView(deps.ledger.projection, 'new', QUEUE_PAGE_LIMIT),
+        }
+        return { status: 200, body: view }
+      }
+
+      const skipMatch = /^POST jobs\/([^/]+)\/skip$/.exec(`${request.method} ${request.path}`)
+      if (skipMatch !== null) {
+        const jobId = decodeURIComponent(skipMatch[1] ?? '')
+        const result = skipJob(deps.ledger, jobId, new Date(clock()).toISOString())
+        return { status: 200, body: { jobId: result.jobId, status: result.status } }
       }
 
       const stateMatch = /^POST apps\/([^/]+)\/state$/.exec(`${request.method} ${request.path}`)
